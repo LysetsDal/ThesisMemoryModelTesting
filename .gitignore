@@ -27,11 +27,13 @@ bld/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+*.user
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 Dotnet/MemoryModelTests/bin/
 obj/
+bin/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
@@ -58,3 +60,11 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 **/*.asm
+
+# Java
+target/
+*.class
+
+#IDEs
+.idea/
+.DS_Store
