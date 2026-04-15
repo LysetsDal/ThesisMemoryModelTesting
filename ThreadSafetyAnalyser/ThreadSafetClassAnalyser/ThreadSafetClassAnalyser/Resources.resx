@@ -122,11 +122,23 @@
     <comment>An optional longer localizable description of the diagnostic.</comment>
   </data>
   <data name="AnalyzerMessageFormat" xml:space="preserve">
-    <value>Type name '{0}' contains lowercase letters</value>
+    <value>Type name '{0}' contains lowercase letters. </value>
     <comment>The format-able message the diagnostic displays.</comment>
   </data>
   <data name="AnalyzerTitle" xml:space="preserve">
     <value>Type name contains lowercase letters</value>
     <comment>The title of the diagnostic.</comment>
+  </data>
+  <data name="FieldUsedTitle" xml:space="preserve">
+    <value>Field used in method</value>
+    <comment>The title of the diagnostic for field usage in methods.</comment>
+  </data>
+  <data name="FieldUsedMessageFormat" xml:space="preserve">
+    <value>Field '{0}' is used in method '{1}'</value>
+    <comment>The format-able message the diagnostic displays when a field is used in a method.</comment>
+  </data>
+  <data name="FieldUsedDescription" xml:space="preserve">
+    <value>Warns when a field is used in any method.</value>
+    <comment>An optional longer localizable description of the diagnostic for field usage.</comment>
   </data>
 </root>

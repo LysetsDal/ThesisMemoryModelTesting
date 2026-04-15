@@ -121,4 +121,8 @@
     <value>Make uppercase</value>
     <comment>The title of the code fix.</comment>
   </data>
+  <data name="MethodCheck" xml:space="preserve">
+    <value>Hello World</value>
+    <comment>Test to see how stuff works</comment>
+  </data>
 </root>

@@ -20,7 +20,8 @@ namespace ThreadSafetClassAnalyser
     {
         public sealed override ImmutableArray<string> FixableDiagnosticIds
         {
-            get { return ImmutableArray.Create(ThreadSafetClassAnalyserAnalyzer.DiagnosticId); }
+            get { return ImmutableArray.Create(ThreadSafetClassAnalyserAnalyzer.DiagnosticId,
+                ThreadSafetClassAnalyserAnalyzer.FieldUsedInMethodDiagnosticId); }
         }
 
         public sealed override FixAllProvider GetFixAllProvider()
@@ -32,21 +33,30 @@ namespace ThreadSafetClassAnalyser
         public sealed override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
             var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-
-            // TODO: Replace the following code with your own analysis, generating a CodeAction for each fix to suggest
             var diagnostic = context.Diagnostics.First();
             var diagnosticSpan = diagnostic.Location.SourceSpan;
 
             // Find the type declaration identified by the diagnostic.
             var declaration = root.FindToken(diagnosticSpan.Start).Parent.AncestorsAndSelf().OfType<TypeDeclarationSyntax>().First();
 
-            // Register a code action that will invoke the fix.
-            context.RegisterCodeFix(
-                CodeAction.Create(
-                    title: CodeFixResources.CodeFixTitle,
-                    createChangedSolution: c => MakeUppercaseAsync(context.Document, declaration, c),
-                    equivalenceKey: nameof(CodeFixResources.CodeFixTitle)),
-                diagnostic);
+            if (diagnostic.Id == ThreadSafetClassAnalyserAnalyzer.DiagnosticId)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        title: CodeFixResources.CodeFixTitle,
+                        createChangedSolution: c => MakeUppercaseAsync(context.Document, declaration, c),
+                        equivalenceKey: nameof(CodeFixResources.CodeFixTitle)),
+                    diagnostic);
+            }
+            else if (diagnostic.Id == ThreadSafetClassAnalyserAnalyzer.FieldUsedInMethodDiagnosticId)
+            {
+                context.RegisterCodeFix(
+                    CodeAction.Create(
+                        title: CodeFixResources.MethodCheck,
+                        createChangedSolution: c => WarnIfFieldUsedInMethodAsync(context.Document, declaration, c),
+                        equivalenceKey: nameof(CodeFixResources.MethodCheck)),
+                    diagnostic);
+            }
         }
 
         private async Task<Solution> MakeUppercaseAsync(Document document, TypeDeclarationSyntax typeDecl, CancellationToken cancellationToken)
@@ -66,6 +76,43 @@ namespace ThreadSafetClassAnalyser
 
             // Return the new solution with the now-uppercase type name.
             return newSolution;
+        }
+
+        private async Task<Solution> WarnIfFieldUsedInMethodAsync(Document document, TypeDeclarationSyntax typeDecl, CancellationToken cancellationToken)
+        {
+            var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+
+            // Find all field declarations in the class
+            var fieldDeclarations = typeDecl.Members.OfType<FieldDeclarationSyntax>().ToList();
+
+            // Find all method declarations in the class
+            var methodDeclarations = typeDecl.Members.OfType<MethodDeclarationSyntax>().ToList();
+
+            // For each field, check if it is used in any method
+            foreach (var fieldDecl in fieldDeclarations)
+            {
+                foreach (var variable in fieldDecl.Declaration.Variables)
+                {
+                    var fieldSymbol = semanticModel.GetDeclaredSymbol(variable, cancellationToken);
+                    if (fieldSymbol == null)
+                        continue;
+
+                    foreach (var methodDecl in methodDeclarations)
+                    {
+                        var dataFlow = semanticModel.AnalyzeDataFlow(methodDecl.Body);
+                        if (dataFlow.ReadInside.Contains(fieldSymbol) || dataFlow.WrittenInside.Contains(fieldSymbol))
+                        {
+                            // Here you would trigger a warning or register a code fix.
+                            // For now, just break out as a placeholder.
+                            // You can later add logic to modify the solution or annotate the code.
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // For now, return the original solution (no changes made)
+            return document.Project.Solution;
         }
     }
 }

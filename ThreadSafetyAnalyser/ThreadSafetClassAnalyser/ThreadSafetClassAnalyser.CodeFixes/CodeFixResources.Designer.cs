@@ -25,16 +25,16 @@ namespace ThreadSafetClassAnalyser
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class CodeFixResources
     {
-
+        
         private static global::System.Resources.ResourceManager resourceMan;
-
+        
         private static global::System.Globalization.CultureInfo resourceCulture;
-
+        
         [global::System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode")]
         internal CodeFixResources()
         {
         }
-
+        
         /// <summary>
         ///   Returns the cached ResourceManager instance used by this class.
         /// </summary>
@@ -51,7 +51,7 @@ namespace ThreadSafetClassAnalyser
                 return resourceMan;
             }
         }
-
+        
         /// <summary>
         ///   Overrides the current thread's CurrentUICulture property for all
         ///   resource lookups using this strongly typed resource class.
@@ -68,7 +68,7 @@ namespace ThreadSafetClassAnalyser
                 resourceCulture = value;
             }
         }
-
+        
         /// <summary>
         ///   Looks up a localized string similar to Make uppercase.
         /// </summary>
@@ -77,6 +77,17 @@ namespace ThreadSafetClassAnalyser
             get
             {
                 return ResourceManager.GetString("CodeFixTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Hello World.
+        /// </summary>
+        internal static string MethodCheck
+        {
+            get
+            {
+                return ResourceManager.GetString("MethodCheck", resourceCulture);
             }
         }
     }
