@@ -1,15 +1,32 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{0CB8F14D-EDDF-488C-BB98-5BCA07759CE3}|ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.csproj|c:\\users\\dvh\\desktop\\github\\itu\\thesismemorymodeltesting\\threadsafetyanalyser\\threadsafetclassanalyser\\threadsafetclassanalyser\\threadsafetclassanalyseranalyzer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{0CB8F14D-EDDF-488C-BB98-5BCA07759CE3}|ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.csproj|solutionrelative:threadsafetclassanalyser\\threadsafetclassanalyseranalyzer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{6406FB27-43C6-4016-87E0-BB930E0CF5AC}|ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyser.CodeFixes.csproj|c:\\users\\dvh\\desktop\\github\\itu\\thesismemorymodeltesting\\threadsafetyanalyser\\threadsafetclassanalyser\\threadsafetclassanalyser.codefixes\\threadsafetclassanalysercodefixprovider.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{6406FB27-43C6-4016-87E0-BB930E0CF5AC}|ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyser.CodeFixes.csproj|solutionrelative:threadsafetclassanalyser.codefixes\\threadsafetclassanalysercodefixprovider.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{6406FB27-43C6-4016-87E0-BB930E0CF5AC}|ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyser.CodeFixes.csproj|c:\\users\\dvh\\desktop\\github\\itu\\thesismemorymodeltesting\\threadsafetyanalyser\\threadsafetclassanalyser\\threadsafetclassanalyser.codefixes\\codefixresources.resx||{81828910-B8B3-4D2B-99A3-067027C180C1}",
+      "RelativeMoniker": "D:0:0:{6406FB27-43C6-4016-87E0-BB930E0CF5AC}|ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyser.CodeFixes.csproj|solutionrelative:threadsafetclassanalyser.codefixes\\codefixresources.resx||{81828910-B8B3-4D2B-99A3-067027C180C1}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{0CB8F14D-EDDF-488C-BB98-5BCA07759CE3}|ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.csproj|c:\\users\\dvh\\desktop\\github\\itu\\thesismemorymodeltesting\\threadsafetyanalyser\\threadsafetclassanalyser\\threadsafetclassanalyser\\resources.resx||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{0CB8F14D-EDDF-488C-BB98-5BCA07759CE3}|ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.csproj|solutionrelative:threadsafetclassanalyser\\resources.resx||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
       "DocumentGroups": [
         {
-          "DockedWidth": 314,
-          "SelectedChildIndex": -1,
+          "DockedWidth": 761,
+          "SelectedChildIndex": 6,
           "Children": [
             {
               "$type": "Bookmark",
@@ -22,11 +39,62 @@
             {
               "$type": "Bookmark",
               "Name": "ST:130:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "CodeFixResources.resx",
+              "DocumentMoniker": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.CodeFixes\\CodeFixResources.resx",
+              "RelativeDocumentMoniker": "ThreadSafetClassAnalyser.CodeFixes\\CodeFixResources.resx",
+              "ToolTip": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.CodeFixes\\CodeFixResources.resx",
+              "RelativeToolTip": "ThreadSafetClassAnalyser.CodeFixes\\CodeFixResources.resx",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001005|",
+              "WhenOpened": "2026-04-15T14:03:43.489Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ThreadSafetClassAnalyserCodeFixProvider.cs",
+              "DocumentMoniker": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyserCodeFixProvider.cs",
+              "RelativeDocumentMoniker": "ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyserCodeFixProvider.cs",
+              "ToolTip": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyserCodeFixProvider.cs",
+              "RelativeToolTip": "ThreadSafetClassAnalyser.CodeFixes\\ThreadSafetClassAnalyserCodeFixProvider.cs",
+              "ViewState": "AgIAACwAAAAAAAAAAAAwwEAAAAA1AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-15T14:03:24.783Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Resources.resx",
+              "DocumentMoniker": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser\\Resources.resx",
+              "RelativeDocumentMoniker": "ThreadSafetClassAnalyser\\Resources.resx",
+              "ToolTip": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser\\Resources.resx",
+              "RelativeToolTip": "ThreadSafetClassAnalyser\\Resources.resx",
+              "ViewState": "AgIAAG8AAAAAAAAAAAAnwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001005|",
+              "WhenOpened": "2026-04-15T13:36:10.347Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "ThreadSafetClassAnalyserAnalyzer.cs",
+              "DocumentMoniker": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyserAnalyzer.cs",
+              "RelativeDocumentMoniker": "ThreadSafetClassAnalyser\\ThreadSafetClassAnalyserAnalyzer.cs",
+              "ToolTip": "C:\\Users\\dvh\\Desktop\\Github\\ITU\\ThesisMemoryModelTesting\\ThreadSafetyAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyser\\ThreadSafetClassAnalyserAnalyzer.cs",
+              "RelativeToolTip": "ThreadSafetClassAnalyser\\ThreadSafetClassAnalyserAnalyzer.cs",
+              "ViewState": "AgIAAFkAAAAAAAAAAAAqwGYAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-04-15T09:31:08.517Z",
+              "EditorCaption": ""
             }
           ]
         },
         {
-          "DockedWidth": 314,
+          "DockedWidth": 155,
           "SelectedChildIndex": -1,
           "Children": [
             {
