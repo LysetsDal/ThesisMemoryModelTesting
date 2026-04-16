@@ -16,7 +16,7 @@ class UnsafeInitializationTest {
     // is not observable when running the program.
     @Test
     public void TestUnsafeInitialization() throws InterruptedException {
-        int N = 100_000;
+        int N = 1_00_000;
         for (int i = 0; i < N; i++) {
 
             Thread t1 = new Thread(() -> {

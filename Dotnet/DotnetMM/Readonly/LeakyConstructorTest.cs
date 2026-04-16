@@ -3,18 +3,13 @@ using Xunit.Abstractions;
 
 namespace MemoryModelTests.Readonly;
 
-public class LeakyConstructorTest
+public class LeakyConstructorTest(ITestOutputHelper testOutputHelper)
 {
-    private readonly ITestOutputHelper _testOutputHelper;
     private static LeakyConstructor _globalInstance;
 
     private Barrier _barrier;
 
     private int _observedData = -1;
-    public LeakyConstructorTest(ITestOutputHelper testOutputHelper)
-    {
-        _testOutputHelper = testOutputHelper;
-    }
 
     [Fact]
     public void Test_Readonly_Can_Be_Zero_During_Construction_Should_Fail()
@@ -49,15 +44,14 @@ public class LeakyConstructorTest
             t1.Join();
             t2.Join();
 
-            // If we catch it, _observedData will be 0
+            // If the global ref is published before the ctor finishes, _observedData will be 0, not 42
             if (_observedData == 0)
             {
-                // Assert.Fail($"FAILURE: Readonly field was 0 at iteration {i}");
                 count++;
             }
         }
         
-        _testOutputHelper.WriteLine($"FAILURE: Readonly field was 0 {count} out of {N} iterations");
+        testOutputHelper.WriteLine($"FAILURE: Readonly field was 0: ({count} / {N} iterations)");
         Assert.NotEqual(0, count);
     }
 

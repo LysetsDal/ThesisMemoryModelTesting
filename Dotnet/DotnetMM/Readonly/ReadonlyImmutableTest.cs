@@ -1,21 +1,24 @@
 using Xunit;
+using Xunit.Abstractions;
 
 namespace MemoryModelTests.Readonly;
 
-public class ReadonlyImmutableTest
+public class ReadonlyImmutableTest(ITestOutputHelper testOutputHelper)
 {
     private Barrier _barrier;
+    private int _observedData = -1;
 
     [Fact]
     public void Test_Readonly_Can_Be_Default_Value_After_Ctor_Finishes()
     {
         var N = 100_000;
-
+        var count = 0;
+        
         for (var i = 0; i < N; i++)
         {
             _barrier = new Barrier(2);
             ReadonlyImmutable readonlyImmutable = null;
-            var observedData = -1;
+            _observedData = -1;
 
             // Thread 1: Constructs the class with the readonly field
             var t1 = new Thread(() =>
@@ -31,7 +34,7 @@ public class ReadonlyImmutableTest
 
                 while (readonlyImmutable == null) { }
 
-                observedData = readonlyImmutable.ReadonlyData;
+                _observedData = readonlyImmutable.ReadonlyData;
             });
 
             t1.Start();
@@ -40,8 +43,16 @@ public class ReadonlyImmutableTest
             t2.Join();
 
             // If readonly semantics failed, observedData should be 0
-            Assert.Equal(1, observedData);
+            if (_observedData == 0)
+            {
+                count++;
+            }
+            
+            Assert.Equal(1, _observedData);
         }
+        
+        testOutputHelper.WriteLine($"DEBUG: Readonly field = 0: ({count} / {N} iterations)");
+        Assert.Equal(0, count);
     }
 
     [Fact]
