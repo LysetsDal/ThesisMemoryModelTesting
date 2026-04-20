@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.37111.16 d17.14
+VisualStudioVersion = 17.14.37111.16
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreadSafetClassAnalyser", "ThreadSafetClassAnalyser\ThreadSafetClassAnalyser.csproj", "{0CB8F14D-EDDF-488C-BB98-5BCA07759CE3}"
 EndProject
@@ -12,6 +12,11 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreadSafetClassAnalyser.Test", "ThreadSafetClassAnalyser.Test\ThreadSafetClassAnalyser.Test.csproj", "{558A2FE3-5D6D-484F-AB7A-EF824B7F45FB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreadSafetClassAnalyser.Vsix", "ThreadSafetClassAnalyser.Vsix\ThreadSafetClassAnalyser.Vsix.csproj", "{5E86CA3F-1743-4533-9E66-15B6B5CBDD0D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
