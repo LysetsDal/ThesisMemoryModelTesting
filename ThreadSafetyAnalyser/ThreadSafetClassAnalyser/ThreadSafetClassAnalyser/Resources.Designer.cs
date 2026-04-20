@@ -88,6 +88,33 @@ namespace ThreadSafetClassAnalyser {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Warns when a field or property is accessed from outside its declaring class, which may indicate state escape or a violation of encapsulation..
+        /// </summary>
+        internal static string FieldAccessedExternallyDescription {
+            get {
+                return ResourceManager.GetString("FieldAccessedExternallyDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The field or property &apos;{0}&apos; is accessed from outside its declaring class &apos;{1}&apos;..
+        /// </summary>
+        internal static string FieldAccessedExternallyMessageFormat {
+            get {
+                return ResourceManager.GetString("FieldAccessedExternallyMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Field or property accessed outside declaring class.
+        /// </summary>
+        internal static string FieldAccessedExternallyTitle {
+            get {
+                return ResourceManager.GetString("FieldAccessedExternallyTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Warns when a field is used in any method..
         /// </summary>
         internal static string FieldUsedDescription {

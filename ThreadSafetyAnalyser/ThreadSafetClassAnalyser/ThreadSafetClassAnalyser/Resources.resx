@@ -141,4 +141,16 @@
     <value>Warns when a field is used in any method.</value>
     <comment>An optional longer localizable description of the diagnostic for field usage.</comment>
   </data>
+  <data name="FieldAccessedExternallyTitle" xml:space="preserve">
+    <value>Field or property accessed outside declaring class</value>
+    <comment>The title of the diagnostic for external field/property access.</comment>
+  </data>
+  <data name="FieldAccessedExternallyMessageFormat" xml:space="preserve">
+    <value>The field or property '{0}' is accessed from outside its declaring class '{1}'.</value>
+    <comment>The format-able message the diagnostic displays when a field or property is accessed externally.</comment>
+  </data>
+  <data name="FieldAccessedExternallyDescription" xml:space="preserve">
+    <value>Warns when a field or property is accessed from outside its declaring class, which may indicate state escape or a violation of encapsulation.</value>
+    <comment>An optional longer localizable description of the diagnostic for external field/property access.</comment>
+  </data>
 </root>
