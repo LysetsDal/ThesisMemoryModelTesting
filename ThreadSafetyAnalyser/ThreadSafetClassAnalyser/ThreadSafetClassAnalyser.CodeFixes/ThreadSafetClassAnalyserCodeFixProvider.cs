@@ -20,8 +20,9 @@ namespace ThreadSafetClassAnalyser
     {
         public sealed override ImmutableArray<string> FixableDiagnosticIds
         {
-            get { return ImmutableArray.Create(ThreadSafetClassAnalyserAnalyzer.DiagnosticId,
-                EncapsulationAnalyser.FieldUsedInMethodDiagnosticId); }
+            get { return ImmutableArray.Create(
+                ThreadSafetClassAnalyserAnalyzer.DiagnosticId,
+                CorrectlySynchronizedAnalyzer.FieldUsedInMethodDiagnosticId); }
         }
 
         public sealed override FixAllProvider GetFixAllProvider()
@@ -48,7 +49,7 @@ namespace ThreadSafetClassAnalyser
                         equivalenceKey: nameof(CodeFixResources.CodeFixTitle)),
                     diagnostic);
             }
-            else if (diagnostic.Id == EncapsulationAnalyser.FieldUsedInMethodDiagnosticId)
+            else if (diagnostic.Id == CorrectlySynchronizedAnalyzer.FieldUsedInMethodDiagnosticId)
             {
                 context.RegisterCodeFix(
                     CodeAction.Create(
