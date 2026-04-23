@@ -13,19 +13,18 @@ namespace ThreadSafetClassAnalyser
     {
         private const string Category = "CorrectlySynchronized";
 
-        public const string FieldUsedInMethodDiagnosticId = "FieldUsedInMethod";
-        private static readonly LocalizableString FieldUsedTitle = new LocalizableResourceString(nameof(Resources.FieldUsedTitle), Resources.ResourceManager, typeof(Resources));
-        private static readonly LocalizableString FieldUsedMessageFormat = new LocalizableResourceString(nameof(Resources.FieldUsedMessageFormat), Resources.ResourceManager, typeof(Resources));
-        private static readonly LocalizableString FieldUsedDescription = new LocalizableResourceString(nameof(Resources.FieldUsedDescription), Resources.ResourceManager, typeof(Resources));
+        public const string FieldUsedDiagnosticId = "FieldUsed";
+        private static readonly AnalyserMetadata FieldUsedMetadata = new AnalyserMetadata(FieldUsedDiagnosticId);
+
         private static readonly DiagnosticDescriptor FieldUsedRule =
             new DiagnosticDescriptor(
-                FieldUsedInMethodDiagnosticId,
-                FieldUsedTitle,
-                FieldUsedMessageFormat,
+                FieldUsedDiagnosticId,
+                FieldUsedMetadata.Title,
+                FieldUsedMetadata.MessageFormat,
                 Category,
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true,
-                description: FieldUsedDescription);
+                description: FieldUsedMetadata.Description);
         
         //Add your rules here.
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics

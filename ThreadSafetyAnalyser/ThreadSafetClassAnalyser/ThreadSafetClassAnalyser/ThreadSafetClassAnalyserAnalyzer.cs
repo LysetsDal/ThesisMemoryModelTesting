@@ -11,12 +11,20 @@ namespace ThreadSafetClassAnalyser
     {
         private const string Category = "Naming";
         public const string DiagnosticId = "ThreadSafetClassAnalyser";
+        
+        private static readonly AnalyserMetadata ThreadSafetClassAnalyserMetadata = new AnalyserMetadata("Analyzer");
+        private static readonly DiagnosticDescriptor Rule = 
+            new DiagnosticDescriptor(
+                DiagnosticId,
+                ThreadSafetClassAnalyserMetadata.Title,
+                ThreadSafetClassAnalyserMetadata.MessageFormat,
+                Category,
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                description: ThreadSafetClassAnalyserMetadata.Description
+            );
 
-        private static readonly LocalizableString Title = new LocalizableResourceString(nameof(Resources.AnalyzerTitle), Resources.ResourceManager, typeof(Resources));
-        private static readonly LocalizableString MessageFormat = new LocalizableResourceString(nameof(Resources.AnalyzerMessageFormat), Resources.ResourceManager, typeof(Resources));
-        private static readonly LocalizableString Description = new LocalizableResourceString(nameof(Resources.AnalyzerDescription), Resources.ResourceManager, typeof(Resources));
-        private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Warning, isEnabledByDefault: true, description: Description);
-
+        
         //Add your rules here.
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
             [DebuggerStepThrough()]

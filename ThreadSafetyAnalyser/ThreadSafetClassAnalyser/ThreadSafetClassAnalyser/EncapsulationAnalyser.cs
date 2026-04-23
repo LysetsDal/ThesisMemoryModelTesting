@@ -13,23 +13,20 @@ namespace ThreadSafetClassAnalyser
     public class EncapsulationAnalyser : DiagnosticAnalyzer
     {
         private const string Category = "Encapsulation";
-
+        
         // --- FieldAccessedExternally Rule ---
         public const string FieldAccessedExternallyDiagnosticId = "FieldAccessedExternally";
-
-        private static readonly LocalizableString FieldAccessedExternallyTitle = new LocalizableResourceString(nameof(Resources.FieldAccessedExternallyTitle), Resources.ResourceManager, typeof(Resources));
-        private static readonly LocalizableString FieldAccessedExternallyMessageFormat = new LocalizableResourceString(nameof(Resources.FieldAccessedExternallyMessageFormat), Resources.ResourceManager, typeof(Resources));
-        private static readonly LocalizableString FieldAccessedExternallyDescription = new LocalizableResourceString(nameof(Resources.FieldAccessedExternallyDescription), Resources.ResourceManager, typeof(Resources));
-
+        private static readonly AnalyserMetadata FieldAccessedExternallyMetadata = new AnalyserMetadata(FieldAccessedExternallyDiagnosticId);
+        
         private static readonly DiagnosticDescriptor FieldAccessedExternallyRule =
             new DiagnosticDescriptor(
                 FieldAccessedExternallyDiagnosticId,
-                FieldAccessedExternallyTitle,
-                FieldAccessedExternallyMessageFormat,
+                FieldAccessedExternallyMetadata.Title,
+                FieldAccessedExternallyMetadata.MessageFormat,
                 Category,
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true,
-                description: FieldAccessedExternallyDescription);
+                description: FieldAccessedExternallyMetadata.Description);
 
         // --- PublicFieldExposed Rule ---
         public const string PublicFieldExposedDiagnosticId = "PublicFieldExposed";
@@ -54,7 +51,8 @@ namespace ThreadSafetClassAnalyser
                 );
             }
         }
-
+        
+        // What events should Roslyn analyser listen to:
         public override void Initialize(AnalysisContext context)
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -63,6 +61,9 @@ namespace ThreadSafetClassAnalyser
             context.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
             context.RegisterSyntaxNodeAction(AnalyzeFieldDeclaration, SyntaxKind.FieldDeclaration);
             context.RegisterSyntaxNodeAction(AnalyzePropertyDeclaration, SyntaxKind.PropertyDeclaration);
+            // Test
+            context.RegisterSyntaxNodeAction(AnalyseReadonlyClassMember, SyntaxKind.FieldDeclaration);
+            context.RegisterSyntaxNodeAction(AnalyseReadonlyClassMember, SyntaxKind.PropertyDeclaration);
         }
 
         // -------------------------------------------------------------------------
@@ -197,6 +198,16 @@ namespace ThreadSafetClassAnalyser
                     context.ReportDiagnostic(diagnostic);
                 }
             }
+        }
+        // -------------------------------------------------------------------------
+        // 
+        // -------------------------------------------------------------------------
+        private static void AnalyseReadonlyClassMember(SyntaxNodeAnalysisContext ctx)
+        {
+            // 1. Get the symbol from the node (this is the 'meaning' of the code)
+            var symbol = ctx.SemanticModel.GetDeclaredSymbol(ctx.Node, ctx.CancellationToken);
+
+
         }
     }
 }
