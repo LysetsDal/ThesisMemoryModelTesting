@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 
+using ThreadSafetClassAnalyser.Utils;
 
 namespace ThreadSafetClassAnalyser
 {
@@ -15,8 +16,9 @@ namespace ThreadSafetClassAnalyser
         private const string Category = "Encapsulation";
         
         // --- FieldAccessedExternally Rule ---
-        public const string FieldAccessedExternallyDiagnosticId = "FieldAccessedExternally";
-        private static readonly AnalyserMetadata FieldAccessedExternallyMetadata = new AnalyserMetadata(FieldAccessedExternallyDiagnosticId);
+        private const string FieldAccessedExternallyDiagnosticId = "FieldAccessedExternally";
+        private static readonly AnalyserMetadata FieldAccessedExternallyMetadata = 
+            new AnalyserMetadata(FieldAccessedExternallyDiagnosticId);
         
         private static readonly DiagnosticDescriptor FieldAccessedExternallyRule =
             new DiagnosticDescriptor(
@@ -29,7 +31,7 @@ namespace ThreadSafetClassAnalyser
                 description: FieldAccessedExternallyMetadata.Description);
 
         // --- PublicFieldExposed Rule ---
-        public const string PublicFieldExposedDiagnosticId = "PublicFieldExposed";
+        private const string PublicFieldExposedDiagnosticId = "PublicFieldExposed";
 
         private static readonly DiagnosticDescriptor PublicFieldExposedRule =
             new DiagnosticDescriptor(
@@ -41,15 +43,33 @@ namespace ThreadSafetClassAnalyser
                 isEnabledByDefault: true,
                 description: "Public fields break encapsulation. Use properties with appropriate accessor modifiers instead.");
 
+        // --- FieldDoesNotUseLock Rule ---
+        private const string FieldDoesNotUseLockId = "FieldDoesNotUseLock";
+
+        private static readonly AnalyserMetadata FieldDoesNotUseLockMetadata =
+            new AnalyserMetadata(FieldDoesNotUseLockId);
+
+        private static readonly DiagnosticDescriptor FieldDoesNotUseLockRule =
+            new DiagnosticDescriptor(
+                FieldDoesNotUseLockId,
+                FieldDoesNotUseLockMetadata.Title,
+                FieldDoesNotUseLockMetadata.MessageFormat,
+                Category,
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                description: FieldAccessedExternallyMetadata.Description
+            );
+        
+        
         // --- Register all supported diagnostics ---
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
             [DebuggerStepThrough()]
-            get {
-                return ImmutableArray.Create(
+            get =>
+                ImmutableArray.Create(
                     FieldAccessedExternallyRule,
-                    PublicFieldExposedRule
+                    PublicFieldExposedRule,
+                    FieldDoesNotUseLockRule
                 );
-            }
         }
         
         // What events should Roslyn analyser listen to:
@@ -61,9 +81,9 @@ namespace ThreadSafetClassAnalyser
             context.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
             context.RegisterSyntaxNodeAction(AnalyzeFieldDeclaration, SyntaxKind.FieldDeclaration);
             context.RegisterSyntaxNodeAction(AnalyzePropertyDeclaration, SyntaxKind.PropertyDeclaration);
-            // Test
-            context.RegisterSyntaxNodeAction(AnalyseReadonlyClassMember, SyntaxKind.FieldDeclaration);
-            context.RegisterSyntaxNodeAction(AnalyseReadonlyClassMember, SyntaxKind.PropertyDeclaration);
+            
+            // Test: 
+            context.RegisterSyntaxNodeAction(AnalyzeMemberAccessWithLock, SyntaxKind.SimpleMemberAccessExpression);
         }
 
         // -------------------------------------------------------------------------
@@ -72,7 +92,7 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzeMemberAccess(SyntaxNodeAnalysisContext context)
         {
             var memberAccess = (MemberAccessExpressionSyntax)context.Node;
-            var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name, context.CancellationToken).Symbol;
+            var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
 
             if (symbol is IFieldSymbol || symbol is IPropertySymbol)
             {
@@ -80,34 +100,102 @@ namespace ThreadSafetClassAnalyser
                 var accessContainingType = context.ContainingSymbol?.ContainingType;
 
                 // Only warn if accessed from outside the declaring type
-                if (accessContainingType == null || !SymbolEqualityComparer.Default.Equals(containingType, accessContainingType))
-                {
-                    var diagnostic = Diagnostic.Create(
-                        FieldAccessedExternallyRule,
-                        memberAccess.Name.GetLocation(),
-                        $"{symbol.Name} is in source: {symbol.Locations[0].IsInSource} is in metadata {symbol.Locations[0].IsInMetadata}",
-                        containingType.Name);
+                if (accessContainingType != null &&
+                    SymbolEqualityComparer.Default.Equals(containingType, accessContainingType))
+                    return;
+                
+                var diagnostic = Diagnostic.Create(
+                    FieldAccessedExternallyRule,
+                    memberAccess.Name.GetLocation(),
+                    $"{symbol.Name} is in source: {symbol.Locations[0].IsInSource} is in metadata {symbol.Locations[0].IsInMetadata}",
+                    containingType.Name);
 
-                    context.ReportDiagnostic(diagnostic);
+                context.ReportDiagnostic(diagnostic);
 
-                    // Optionally, get the declaring syntax for more precise location
-                    var syntaxRef = symbol.DeclaringSyntaxReferences.FirstOrDefault();
-                    if (syntaxRef != null)
-                    {
-                        var syntax = syntaxRef.GetSyntax(context.CancellationToken);
-                        var location = syntax.GetLocation();
+                // Optionally, get the declaring syntax for more precise location
+                var syntaxRef = symbol.DeclaringSyntaxReferences.FirstOrDefault();
+                if (syntaxRef == null) return;
+                
+                var syntax = syntaxRef.GetSyntax(context.CancellationToken);
+                var location = syntax.GetLocation();
 
-                        // Now report the diagnostic at the precise declaration location
-                        var declarationDiagnostic = Diagnostic.Create(
-                            FieldAccessedExternallyRule,
-                            location,
-                            symbol.Name,
-                            symbol.ContainingType.Name);
+                // Now report the diagnostic at the precise declaration location
+                var declarationDiagnostic = Diagnostic.Create(
+                    FieldAccessedExternallyRule,
+                    location,
+                    symbol.Name,
+                    symbol.ContainingType.Name);
 
-                        context.ReportDiagnostic(declarationDiagnostic);
-                    }
-                }
+                context.ReportDiagnostic(declarationDiagnostic);
             }
+        }
+        // -------------------------------------------------------------------------
+        // Existing: FieldAccessedExternally (WithoutALock)
+        // -------------------------------------------------------------------------
+        private static void AnalyzeMemberAccessWithLock(SyntaxNodeAnalysisContext context)
+        {
+            var memberAccess = (MemberAccessExpressionSyntax)context.Node;
+            var memberName = memberAccess.Name.Identifier.Text;
+            var className = context.ContainingSymbol?.ContainingType;
+
+            var methodSymbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
+            // Only run this logic for Methods
+            if (!(methodSymbol is IMethodSymbol ))
+                return;
+            
+            var isInSource = methodSymbol.Locations.FirstOrDefault().IsInSource;
+            if (!isInSource) return;
+            
+            var containingSymbol = (INamedTypeSymbol) methodSymbol.ContainingSymbol;
+            if (!(methodSymbol.ContainingSymbol is INamedTypeSymbol))
+                return;
+            
+            var containingMethodSymbol = containingSymbol.GetMembers(methodSymbol.Name)
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault();
+            
+            
+            var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+
+            LockStatementSyntax parentLock = null;
+            if (containingMethodSyntaxRef != null)
+            {
+                var methodDecl = containingMethodSyntaxRef.GetSyntax();
+                parentLock = methodDecl.DescendantNodes()
+                    .OfType<LockStatementSyntax>()
+                    .FirstOrDefault();
+            }
+            
+            if (parentLock == null)
+            {
+                // No lock found at all!
+                var diagnostic = Diagnostic.Create(
+                    FieldDoesNotUseLockRule,
+                    memberAccess.Name.GetLocation(),
+                    memberName,
+                    className
+                    );
+
+                context.ReportDiagnostic(diagnostic);
+                return;
+            }
+            
+            // Get the semantic model specifically for the tree containing the parentLock
+            var definitionModel = context.Compilation.GetSemanticModel(parentLock.SyntaxTree);
+            
+            // 2. Check if it's the RIGHT lock
+            // var lockSymbol = SyntaxNodeHelpers.GetLockObjectSymbol(parentLock, context.SemanticModel);
+            //
+            // if (lockSymbol == null || lockSymbol.Name != "_lockObj") 
+            // {
+            //     var diagnostic = Diagnostic.Create(
+            //         FieldDoesNotUseLockRule,
+            //         parentLock.GetLocation(), // Highlight the faulty lock statement
+            //         memberName,
+            //         $"Access is locked by '{lockSymbol?.Name ?? "unknown"}', but should be '_lockObj'.");
+            //
+            //     context.ReportDiagnostic(diagnostic);
+            // }
         }
 
         // -------------------------------------------------------------------------
@@ -116,7 +204,11 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzeFieldDeclaration(SyntaxNodeAnalysisContext context)
         {
             var fieldDecl = (FieldDeclarationSyntax)context.Node;
-
+            
+            // Rule does not apply to Interfaces, Records or Structs
+            if (!SyntaxNodeHelpers.IsFieldOrPropParentAClass(context))
+                return;
+            
             // Only care about public fields
             if (!fieldDecl.Modifiers.Any(SyntaxKind.PublicKeyword))
                 return;
@@ -150,7 +242,11 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzePropertyDeclaration(SyntaxNodeAnalysisContext context)
         {
             var propDecl = (PropertyDeclarationSyntax)context.Node;
-
+            
+            // Rule does not apply to Interfaces, Records or Structs
+            if (!SyntaxNodeHelpers.IsFieldOrPropParentAClass(context))
+                return;
+            
             // Only care about public properties
             if (!propDecl.Modifiers.Any(SyntaxKind.PublicKeyword))
                 return;
@@ -205,9 +301,18 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyseReadonlyClassMember(SyntaxNodeAnalysisContext ctx)
         {
             // 1. Get the symbol from the node (this is the 'meaning' of the code)
-            var symbol = ctx.SemanticModel.GetDeclaredSymbol(ctx.Node, ctx.CancellationToken);
+            // var symbol = ctx.SemanticModel.GetDeclaredSymbol(ctx.Node, ctx.CancellationToken);
 
+            var classDeclaration = (ClassDeclarationSyntax)ctx.Node;
 
+            var members = classDeclaration.Members;
+            
+            foreach (MemberDeclarationSyntax member in members)
+            {
+                var location = member.GetLocation();
+                var type = member.GetType();
+                var reference = member.GetReference();
+            }
         }
     }
 }

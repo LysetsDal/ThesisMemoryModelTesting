@@ -55,9 +55,9 @@ namespace ThreadSafetClassAnalyser
 
             if (namedTypeSymbol.Name.ToCharArray().Any(char.IsLower))
             {
-                var diagnostic = Diagnostic.Create(Rule, namedTypeSymbol.Locations[0], namedTypeSymbol.Name);
-
-                context.ReportDiagnostic(diagnostic);
+                // var diagnostic = Diagnostic.Create(Rule, namedTypeSymbol.Locations[0], namedTypeSymbol.Name);
+                //
+                // context.ReportDiagnostic(diagnostic);
             }
         }
     }

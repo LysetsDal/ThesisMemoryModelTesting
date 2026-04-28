@@ -153,4 +153,13 @@
     <value>Warns when a field or property is accessed from outside its declaring class, which may indicate state escape or a violation of encapsulation.</value>
     <comment>An optional longer localizable description of the diagnostic for external field/property access.</comment>
   </data>
+  <data name="FieldDoesNotUseLockDescription" xml:space="preserve">
+    <value>Warn when a field or property accessor is publicly visible and doesn't use a lock.</value>
+  </data>
+  <data name="FieldDoesNotUseLockTitle" xml:space="preserve">
+    <value>Accessor is publicly available but doesn't use a lock.</value>
+  </data>
+  <data name="FieldDoesNotUseLockMessageFormat" xml:space="preserve">
+    <value>The Accessor '{0}' in '{1}' can be called from outside its declaring class and doesn't use a lock. </value>
+  </data>
 </root>

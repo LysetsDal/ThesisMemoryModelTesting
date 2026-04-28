@@ -428,3 +428,5 @@ FodyWeavers.xsd
 *.msm
 *.msp
 *.vs/
+/DummyApp/DummyApp.csproj
+/DummyApp/
