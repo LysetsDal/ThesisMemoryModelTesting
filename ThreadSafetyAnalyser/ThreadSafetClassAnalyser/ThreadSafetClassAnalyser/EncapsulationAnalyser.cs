@@ -140,32 +140,20 @@ namespace ThreadSafetClassAnalyser
 
             var methodSymbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
             // Only run this logic for Methods
-            if (!(methodSymbol is IMethodSymbol ))
+            if (!(methodSymbol is IMethodSymbol))
                 return;
             
             var isInSource = methodSymbol.Locations.FirstOrDefault().IsInSource;
             if (!isInSource) return;
             
-            var containingSymbol = (INamedTypeSymbol) methodSymbol.ContainingSymbol;
             if (!(methodSymbol.ContainingSymbol is INamedTypeSymbol))
                 return;
             
-            var containingMethodSymbol = containingSymbol.GetMembers(methodSymbol.Name)
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault();
-            
-            
-            var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+            LockStatementSyntax parentLock =
+                SyntaxNodeHelpers.FindSurroundingLockFromMethodSymbol(methodSymbol);
 
-            LockStatementSyntax parentLock = null;
-            if (containingMethodSyntaxRef != null)
-            {
-                var methodDecl = containingMethodSyntaxRef.GetSyntax();
-                parentLock = methodDecl.DescendantNodes()
-                    .OfType<LockStatementSyntax>()
-                    .FirstOrDefault();
-            }
             
+            // Pt 'dumb' only knows if a Method call has a lock somewhere inside before a method, prop or class boundary is hit
             if (parentLock == null)
             {
                 // No lock found at all!
@@ -183,19 +171,7 @@ namespace ThreadSafetClassAnalyser
             // Get the semantic model specifically for the tree containing the parentLock
             var definitionModel = context.Compilation.GetSemanticModel(parentLock.SyntaxTree);
             
-            // 2. Check if it's the RIGHT lock
-            // var lockSymbol = SyntaxNodeHelpers.GetLockObjectSymbol(parentLock, context.SemanticModel);
-            //
-            // if (lockSymbol == null || lockSymbol.Name != "_lockObj") 
-            // {
-            //     var diagnostic = Diagnostic.Create(
-            //         FieldDoesNotUseLockRule,
-            //         parentLock.GetLocation(), // Highlight the faulty lock statement
-            //         memberName,
-            //         $"Access is locked by '{lockSymbol?.Name ?? "unknown"}', but should be '_lockObj'.");
-            //
-            //     context.ReportDiagnostic(diagnostic);
-            // }
+            // 2. Check if it's the RIGHT lock?
         }
 
         // -------------------------------------------------------------------------

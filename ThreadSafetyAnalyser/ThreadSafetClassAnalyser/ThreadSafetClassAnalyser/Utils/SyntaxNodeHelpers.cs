@@ -2,6 +2,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System.Linq;
+
 
 namespace ThreadSafetClassAnalyser.Utils
 {
@@ -23,15 +25,13 @@ namespace ThreadSafetClassAnalyser.Utils
         }
         
         /// <summary>
-        /// Helper method that walks up the syntax tree, to determine if a SyntaxNode's parent
-        /// is surrounded by a lock. Stops if we hit a method or class boundary. 
+        /// Helper method that walks up the syntax tree, to determine if a SyntaxNode's parent is surrounded by a lock. Stops if we hit a method or class boundary. 
         /// </summary>
         /// <param name="node">
         /// The entry point / point of access in the tree we want to walk up from. 
         /// </param>
         /// <returns>
-        /// The Surrounding paramLockStatementSyntax or null (if nothing was found before a
-        /// method/class boundary) 
+        /// The Surrounding paramLockStatementSyntax or null (if nothing was found before a method/class boundary) 
         /// </returns>
         public static LockStatementSyntax GetParentLockFromSyntaxNode(SyntaxNode node)
         {
@@ -55,19 +55,54 @@ namespace ThreadSafetClassAnalyser.Utils
             return null;
         }
         
+        
         /// <summary>
-        /// Helper method that retrieves the symbol inside the lock statement to find out what
-        /// object is being used to lock. E.g. in 'lock(_syncLock)', it returns the symbol _syncLock.
+        /// Looks ar a method outside -> in, returns the first sorrounding lock it finds inside the method.
+        /// </summary>
+        /// <param name="methodSymbol"></param>
+        /// <returns></returns>
+        public static LockStatementSyntax FindSurroundingLockFromMethodSymbol(ISymbol methodSymbol)
+        {
+            var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+
+            LockStatementSyntax parentLock = null;
+            if (containingMethodSyntaxRef != null)
+            {
+                var methodDecl = containingMethodSyntaxRef.GetSyntax();
+                parentLock = methodDecl.DescendantNodes()
+                    .OfType<LockStatementSyntax>()
+                    .FirstOrDefault();
+            }
+
+            return parentLock;
+        }
+        
+        /// <summary>
+        /// Finds the first enclosing lock (inside -> out) from a Syntax node
+        /// </summary>
+        /// <param name="node"></param> the node to traverse up the tree from.
+        /// <returns></returns>
+        public static LockStatementSyntax GetEnclosingLock(SyntaxNode node)
+        {
+            // .Ancestors() walks UP the tree from the current node to the Root
+            return node.Ancestors().OfType<LockStatementSyntax>().FirstOrDefault();
+        }
+        
+        /// <summary>
+        /// Helper method that retrieves the symbol inside the lock statement to find out what object is being used to lock. E.g. in 'lock(_syncLock)', it returns the symbol _syncLock.
         /// </summary>
         /// <param name="lockStatement">
         /// A lock stamtnet from the Syntax Tree
         /// </param>
         /// /// <param name="semanticModel">
-        /// The semantic model from a Syntax Analysis Context.
+        /// The semantic model that the lockStatement exists in.
         /// </param>
         /// <returns>
         /// The Symbol (ISymbol) of the object used inside the lock stament 
         /// </returns>
+        /// <remarks>
+        /// If you encounter an 'System.ArgumentException: Syntax node is not within syntax tree', you are passing the wrong semanticModel.
+        /// </remarks>
         public static ISymbol GetLockObjectSymbol(LockStatementSyntax lockStatement, SemanticModel semanticModel)
         {
             if (lockStatement == null) return null;
