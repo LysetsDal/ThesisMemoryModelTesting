@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using DummyApp.Model;
 
 namespace DummyApp;
@@ -14,5 +14,6 @@ class Program
         test.GetCount();
         test.GetCountLocked();
         
+        test.MethodWithDoubleNestedLocks();
     }
 }

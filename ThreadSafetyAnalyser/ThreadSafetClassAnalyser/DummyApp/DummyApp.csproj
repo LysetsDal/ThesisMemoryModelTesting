@@ -13,9 +13,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Reference so we can use [ThreadSafe] annotation -->
+        <ProjectReference Include="../ThreadsafeClassAnalyser.Annotations/ThreadsafeClassAnalyser.Annotations.csproj" />
+        
         <ProjectReference Include="../ThreadSafetClassAnalyser/ThreadSafetClassAnalyser.csproj"
                           OutputItemType="Analyzer"
                           ReferenceOutputAssembly="false" />
     </ItemGroup>
-
 </Project>

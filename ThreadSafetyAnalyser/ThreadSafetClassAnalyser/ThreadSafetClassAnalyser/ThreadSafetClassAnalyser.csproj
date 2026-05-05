@@ -21,4 +21,19 @@
     <EmbeddedResource Update="Resources.resx" Generator="ResXFileCodeGenerator" LastGenOutput="Resources.Designer.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Annotations\" />
+    <Folder Include="External\" />
+    <Folder Include="Internal\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThreadsafeClassAnalyser.Annotations\ThreadsafeClassAnalyser.Annotations.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- This bundles the Annotations.dll inside the analyzer package -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
 </Project>

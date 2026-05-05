@@ -44,7 +44,7 @@ namespace ThreadSafetClassAnalyser
             context.EnableConcurrentExecution();
 
             //Register the Actions here.
-            context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
+            // context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
         }
         private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
         {

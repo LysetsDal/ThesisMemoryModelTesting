@@ -153,6 +153,7 @@
     <value>Warns when a field or property is accessed from outside its declaring class, which may indicate state escape or a violation of encapsulation.</value>
     <comment>An optional longer localizable description of the diagnostic for external field/property access.</comment>
   </data>
+  
   <data name="FieldDoesNotUseLockDescription" xml:space="preserve">
     <value>Warn when a field or property accessor is publicly visible and doesn't use a lock.</value>
   </data>
@@ -162,4 +163,25 @@
   <data name="FieldDoesNotUseLockMessageFormat" xml:space="preserve">
     <value>The Accessor '{0}' in '{1}' can be called from outside its declaring class and doesn't use a lock. </value>
   </data>
+  
+  <data name="TestRuleTitle" xml:space="preserve">
+    <value>TEST</value>
+  </data>
+  <data name="TestRuleDescription" xml:space="preserve">
+    <value>TEST</value>
+  </data>
+  <data name="TestRuleMessageFormat" xml:space="preserve">
+    <value>TEST: '{0}' ; '{1}'</value>
+  </data>
+  
+  <data name="InternalFieldNoLockTitle" xml:space="preserve">
+    <value>Field or property not properly synchronized</value>
+  </data>
+  <data name="InternalFieldNoLockDescription" xml:space="preserve">
+    <value>Internal field or property not properly synchronized</value>
+  </data>
+  <data name="InternalFieldNoLockMessageFormat" xml:space="preserve">
+    <value>The field '{0}' in '{1}' is exposed through method '{2}' without a lock</value>
+  </data>
+  
 </root>
