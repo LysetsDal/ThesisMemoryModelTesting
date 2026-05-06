@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -6,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Linq;
+using ThreadSafetClassAnalyser.Model;
 
 
 namespace ThreadSafetClassAnalyser.Utils
@@ -87,7 +87,12 @@ namespace ThreadSafetClassAnalyser.Utils
             return fieldDecl.Declaration.Variables.FirstOrDefault();
         }
         
-
+        /// <summary>
+        /// Returns a dictionary of Locks, and a LockAssociation list of all members where this lock is used as a target (e.g. lock($target) { ... } )
+        /// </summary>
+        /// <param name="classSymbol">The Symbol of the class to find locks in</param>
+        /// <param name="semanticModel">The Semantic model of the classSymbol</param>
+        /// <returns>A dictionary of [Key: LockSymbols, Value: <see cref="LockAssociation"/>]</returns>
         public static ImmutableDictionary<ISymbol, ImmutableArray<LockAssociation>> 
             GetClassLockAssociationDict(INamedTypeSymbol classSymbol, SemanticModel semanticModel)
         {
@@ -157,44 +162,5 @@ namespace ThreadSafetClassAnalyser.Utils
             return parentLock;
         }
         
-        /// <summary>
-        /// Finds the first enclosing lock from the current Syntax node  (inside -> out).
-        /// </summary>
-        /// <param name="node"></param> the symbol to traverse up the tree from.
-        /// <returns></returns>
-        public static LockStatementSyntax GetEnclosingLockFromCurrentNode(SyntaxNode node)
-        {
-            // .Ancestors() walks UP the tree from the current node to the Root
-            var ancestors = node.Ancestors();
-            var res = ancestors.OfType<LockStatementSyntax>().FirstOrDefault(); 
-            return res;
-        }
-        
-        /// <summary>
-        /// Helper method that retrieves the symbol inside the lock statement to find out what object is being used to lock. E.g. in 'lock(_syncLock)', it returns the symbol _syncLock.
-        /// </summary>
-        /// <param name="lockStatement">
-        /// A lock stamtnet from the Syntax Tree
-        /// </param>
-        /// /// <param name="semanticModel">
-        /// The semantic model that the lockStatement exists in.
-        /// </param>
-        /// <returns>
-        /// The Symbol (ISymbol) of the object used inside the lock stament 
-        /// </returns>
-        /// <remarks>
-        /// If you encounter an 'System.ArgumentException: Syntax node is not within syntax tree', you are passing the wrong semanticModel.
-        /// </remarks>
-        public static ISymbol GetLockObjectSymbol(LockStatementSyntax lockStatement, SemanticModel semanticModel)
-        {
-            if (lockStatement == null) return null;
-
-            // The 'Expression' is what is inside the parentheses: lock(expression)
-            var lockExpression = lockStatement.Expression;
-    
-            // Get the symbol (Field, Property, or Local Variable)
-            var symbolInfo = semanticModel.GetSymbolInfo(lockExpression);
-            return symbolInfo.Symbol;
-        }
     }
 }

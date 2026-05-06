@@ -192,4 +192,13 @@
   <data name="LockObjectExposedMessageFormat" xml:space="preserve">
     <value>The Lock '{0}' in class '{1}' is publicly exposed via accessor '{2}'</value>
   </data>
+  <data name="PublicFieldExposedTitle" xml:space="preserve">
+    <value>Public field exposes internal state</value>
+  </data>
+  <data name="PublicFieldExposedDescription" xml:space="preserve">
+    <value>Public fields break encapsulation. Use properties with appropriate accessor modifiers instead</value>
+  </data>
+  <data name="PublicFieldExposedMessageFormat" xml:space="preserve">
+    <value>Field '{0}' is public. {1}</value>
+  </data>
 </root>

@@ -7,14 +7,17 @@ namespace DummyApp.Model;
 [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
 // Custom Annotation
-[ThreadSafe("_lock")]
+[ThreadSafe]
 public class Test
 {
     private readonly object _lock = new();
     private readonly object _anotherLock = new();
     
     public int _transactions = 0;
+    public readonly int _transactionReadOnly = 1;
+    
     private int _count = 0;
+    private readonly int _countReadOnly = 1;
 
     
     public bool PublicFieldBreakingEncapsulation = true;
@@ -23,9 +26,11 @@ public class Test
     
     
     public bool PublicPropBreakingEncapsulation { get; set; }
-    
     private bool PrivatePropBreakingEncapsulation { get; set; }
     
+    // -----------------------------
+    // ---------- METHODS ----------
+    // -----------------------------
     public int PublicPropWithSynchronization
     {
         get
@@ -75,6 +80,13 @@ public class Test
         _count = count;
     }   
     
+    public int GetCountReadOnly()
+    { 
+        //TODO: Should probably not flag readonly member
+        return _countReadOnly;
+    }
+    
+    
     public int GetTransactions()
     { 
         return _transactions;
@@ -87,6 +99,7 @@ public class Test
     
     public object GetSyncObject()
     {
+        //TODO: What should we do when two rules are violated on the same location?
         return _anotherLock;
     }
 }

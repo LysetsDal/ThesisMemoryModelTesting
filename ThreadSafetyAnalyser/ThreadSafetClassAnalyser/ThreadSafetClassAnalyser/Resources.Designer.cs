@@ -170,5 +170,23 @@ namespace ThreadSafetClassAnalyser {
                 return ResourceManager.GetString("LockObjectExposedMessageFormat", resourceCulture);
             }
         }
+        
+        internal static string PublicFieldExposedTitle {
+            get {
+                return ResourceManager.GetString("PublicFieldExposedTitle", resourceCulture);
+            }
+        }
+        
+        internal static string PublicFieldExposedDescription {
+            get {
+                return ResourceManager.GetString("PublicFieldExposedDescription", resourceCulture);
+            }
+        }
+        
+        internal static string PublicFieldExposedMessageFormat {
+            get {
+                return ResourceManager.GetString("PublicFieldExposedMessageFormat", resourceCulture);
+            }
+        }
     }
 }
