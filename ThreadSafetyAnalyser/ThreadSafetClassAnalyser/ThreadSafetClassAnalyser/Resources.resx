@@ -183,5 +183,13 @@
   <data name="InternalFieldNoLockMessageFormat" xml:space="preserve">
     <value>The field '{0}' in '{1}' is exposed through method '{2}' without a lock</value>
   </data>
-  
+  <data name="LockObjectExposedTitle" xml:space="preserve">
+    <value>Lock object publicly exposed</value>
+  </data>
+  <data name="LockObjectExposedDescription" xml:space="preserve">
+    <value>A lock object is being exposed via a public accessor</value>
+  </data>
+  <data name="LockObjectExposedMessageFormat" xml:space="preserve">
+    <value>The Lock '{0}' in class '{1}' is publicly exposed via accessor '{2}'</value>
+  </data>
 </root>

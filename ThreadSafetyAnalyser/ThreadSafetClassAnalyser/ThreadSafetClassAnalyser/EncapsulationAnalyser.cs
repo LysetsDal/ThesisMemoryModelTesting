@@ -75,6 +75,23 @@ namespace ThreadSafetClassAnalyser
                 DiagnosticSeverity.Warning,
                 isEnabledByDefault: true,
                 description: InternalFieldNoLockMetadata.Description
+            );        
+        
+        // --- Lock Object Exposed via Public Accessor ---
+        private const string LockObjectExposedId = "LockObjectExposed";
+
+        private static readonly AnalyserMetadata lockObjectExposedMetadata =
+            new AnalyserMetadata(LockObjectExposedId);
+        
+        private static readonly DiagnosticDescriptor LockObjectExposedRule =
+            new DiagnosticDescriptor(
+                LockObjectExposedId,
+                lockObjectExposedMetadata.Title,
+                lockObjectExposedMetadata.MessageFormat,
+                Category,
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                description: lockObjectExposedMetadata.Description
             );
         
         // --- Test Rule ---
@@ -103,6 +120,7 @@ namespace ThreadSafetClassAnalyser
                     PublicFieldExposedRule,
                     InternalFieldNoLockRule,
                     FieldDoesNotUseLockRule,
+                    LockObjectExposedRule,
                     TestRule
                 );
         }
@@ -129,36 +147,88 @@ namespace ThreadSafetClassAnalyser
             // [Internal] This rule flags fields internally, if they have public accessors without synchronization.
             context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.FieldDeclaration);
             
-            // [Internal] Finds all locks in a namedType (a class).
-            context.RegisterSymbolAction(AnalyzeClassLocks, SymbolKind.NamedType);
+            // [Internal] Finds all locks in a namedType (a class) that are exposed through public accessor.
+            context.RegisterSymbolAction(AnalyzeExposedClassLocks, SymbolKind.NamedType);
             
             
         }
         
-        
-        private static void AnalyzeClassLocks(SymbolAnalysisContext context)
+        // -------------------------------------------------------------------------
+        // Internal: FieldAccessedExternally
+        // -------------------------------------------------------------------------
+        private static void AnalyzeExposedClassLocks(SymbolAnalysisContext context)
         {
-            // Guard Clause: Only run if annotated with: [ThreadSafe]
             if (!AnalysisHelpers.IsInThreadSafeClass(context)) return;
             
             var classSymbol = (INamedTypeSymbol)context.Symbol;
-    
-            // We only care about classes
             if (classSymbol.TypeKind != TypeKind.Class) return;
 
-            // We need a SemanticModel to resolve what the lock expressions point to
-            // Since a symbol can span files, we grab the model from the first declaration
             var firstRef = classSymbol.DeclaringSyntaxReferences.FirstOrDefault();
             if (firstRef == null) return;
             var semanticModel = context.Compilation.GetSemanticModel(firstRef.SyntaxTree);
-
-            // Call your helper
-            var lockMap = 
-                AnalysisHelpers.GetClassLockAssociationDict(classSymbol, semanticModel);
-
-            var attrib = AnalysisHelpers.GetThreadSafeAttribute(classSymbol);
             
-            var test = 0;
+            // 1. Get the map of symbols actually used for locking
+            var lockMap = AnalysisHelpers.GetClassLockAssociationDict(classSymbol, semanticModel);
+            var allLockSymbols = lockMap.Keys.ToImmutableHashSet(SymbolEqualityComparer.Default);
+
+            if (allLockSymbols.IsEmpty) return;
+
+            // 2. Broaden the search: Check EVERY member of the class
+            foreach (var member in classSymbol.GetMembers())
+            {
+                // ALLOW Methods (GetSyncObject) and Properties
+                if (!(member is IMethodSymbol) && !(member is IPropertySymbol)) continue;
+    
+                // Only flag if the member is Public
+                if (member.DeclaredAccessibility != Accessibility.Public) continue;
+                
+                foreach (var syntaxRef in member.DeclaringSyntaxReferences)
+                {
+                    var memberSyntax = syntaxRef.GetSyntax();
+
+                    // 3. Find all potential exit points (Returns and Arrows)
+                    var returns = memberSyntax.DescendantNodes().OfType<ReturnStatementSyntax>();
+                    var arrows = memberSyntax.DescendantNodes().OfType<ArrowExpressionClauseSyntax>();
+                        
+                    foreach (var ret in returns)
+                    {
+                        if (ret.Expression != null)
+                        {
+                            CheckAndReportLockObjectExposedRule(context, semanticModel, ret.Expression, allLockSymbols, member, classSymbol.Name);
+                        }
+                    }
+                        
+                    foreach (var arrow in arrows)
+                    {
+                        CheckAndReportLockObjectExposedRule(context, semanticModel, arrow.Expression, allLockSymbols, member, classSymbol.Name);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Helper func for AnalyzeExposedClassLocks() to verify if an expression resolves to one of our forbidden lock symbols.
+        /// </summary>
+        private static void CheckAndReportLockObjectExposedRule(
+            SymbolAnalysisContext context, 
+            SemanticModel semanticModel, 
+            ExpressionSyntax expression, 
+            IImmutableSet<ISymbol> lockSymbols,
+            ISymbol member,
+            string className)
+        {
+            var returnedSymbol = semanticModel.GetSymbolInfo(expression).Symbol;
+
+            if (returnedSymbol == null || !lockSymbols.Contains(returnedSymbol)) return;
+            
+            var diagnostic = Diagnostic.Create(
+                LockObjectExposedRule, 
+                expression.GetLocation(), 
+                returnedSymbol.Name,
+                className,
+                member.Name);
+
+            context.ReportDiagnostic(diagnostic);
         }
 
         // -------------------------------------------------------------------------

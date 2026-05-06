@@ -84,4 +84,9 @@ public class Test
     {
         _transactions = count;
     }
+    
+    public object GetSyncObject()
+    {
+        return _anotherLock;
+    }
 }

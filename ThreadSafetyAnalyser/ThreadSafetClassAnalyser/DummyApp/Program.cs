@@ -1,15 +1,14 @@
-using System;
 using DummyApp.Model;
 
 namespace DummyApp;
 
-class Program
+internal static class Program
 {
-    static void Main(string[] args)
+    private static void Main(string[] args)
     {
         Console.WriteLine("Hello, World!");
 
-        Test test = new Test();
+        var test = new Test();
 
         test.GetCount();
         test.GetCountLocked();

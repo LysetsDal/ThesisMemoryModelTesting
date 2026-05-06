@@ -41,7 +41,7 @@ namespace ThreadSafetClassAnalyser.Utils
 
         /// <summary>
         /// Determines if the current symbol analysis context is for a class marked with [ThreadSafe].
-        /// Used for methods registered with 'RegisterSymbolAction()' in the Initialize method.
+        /// Used for methods registered with 'RegisterSymbolAction()' and 'SymbolKind.NamedType' in the Initialize method.
         /// </summary>
         /// <param name="context">A SymbolAnalysisContext</param>
         public static bool IsInThreadSafeClass(SymbolAnalysisContext context)
@@ -65,7 +65,7 @@ namespace ThreadSafetClassAnalyser.Utils
         /// </summary>
         /// <param name="symbol">The symbol to inspect.</param>
         /// <returns>The AttributeData if found, otherwise null.</returns>
-        public static AttributeData GetThreadSafeAttribute(ISymbol symbol)
+        private static AttributeData GetThreadSafeAttribute(ISymbol symbol)
         {
             if (symbol == null) return null;
 
@@ -117,17 +117,16 @@ namespace ThreadSafetClassAnalyser.Utils
                     {
                         memberSymbol = semanticModel.GetDeclaredSymbol(enclosingMember);
                     }
+
+                    if (lockObjSymbol == null) continue;
                     
-                    if (lockObjSymbol != null)
+                    if (!lockMapping.ContainsKey(lockObjSymbol))
                     {
-                        if (!lockMapping.ContainsKey(lockObjSymbol))
-                        {
-                            lockMapping[lockObjSymbol] = new List<LockAssociation>();
-                        }
-                        
-                        // Use the primary constructor of your new struct
-                        lockMapping[lockObjSymbol].Add(new LockAssociation(memberSymbol, lockStmt));
+                        lockMapping[lockObjSymbol] = new List<LockAssociation>();
                     }
+                        
+                    // Use the primary constructor of your new struct
+                    lockMapping[lockObjSymbol].Add(new LockAssociation(memberSymbol, lockStmt));
                 }
             }
             
