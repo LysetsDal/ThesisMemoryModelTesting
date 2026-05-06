@@ -10,7 +10,7 @@ public class FinalImmutabilityTest {
 
     private CyclicBarrier barrier;
 
-    private volatile FinalImmutability finalImmutability;
+    private static FinalImmutability finalImmutability;
 
     private int observedData;
 

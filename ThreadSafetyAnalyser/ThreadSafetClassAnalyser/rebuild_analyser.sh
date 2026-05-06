@@ -18,6 +18,9 @@ echo "🧹 Cleaning and Restoring..."
 dotnet clean
 dotnet restore
 
+echo "🛠️ Building Annotations Library..."
+dotnet build ThreadsafeClassAnalyser.Annotations/ThreadsafeClassAnalyser.Annotations.csproj -c Debug
+
 echo "🛠️ Building Analyzer..."
 dotnet build ThreadSafetClassAnalyser/ThreadSafetClassAnalyser.csproj -c Debug
 

@@ -20,6 +20,8 @@ public class UnsafeInitializationTest
     {
         var N = 100_000;
 
+        var count = 0;
+
         for (var i = 0; i < N; i++)
         {
             var t1 = new Thread(() => { u = new UnsafeInitialization(); });
@@ -29,6 +31,7 @@ public class UnsafeInitializationTest
                 if (u != null && u.readX() != 42)
                 {
                     _testOutputHelper.WriteLine("T2: readX(): " + u.readX());
+                    count++;
                     Assert.Fail("T2: x is not equal 42");
                 }
             });
@@ -38,6 +41,7 @@ public class UnsafeInitializationTest
                 if (u != null && u.readO() == null)
                 {
                     _testOutputHelper.WriteLine("T3: readO(): " + u.readO());
+                    count++;
                     Assert.Fail("T3: o is null");
                 }
             });
@@ -52,5 +56,7 @@ public class UnsafeInitializationTest
 
             u = null;
         }
+        
+        Assert.Equal(0, count);
     }
 }

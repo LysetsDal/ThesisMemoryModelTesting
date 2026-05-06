@@ -153,6 +153,7 @@
     <value>Warns when a field or property is accessed from outside its declaring class, which may indicate state escape or a violation of encapsulation.</value>
     <comment>An optional longer localizable description of the diagnostic for external field/property access.</comment>
   </data>
+  
   <data name="FieldDoesNotUseLockDescription" xml:space="preserve">
     <value>Warn when a field or property accessor is publicly visible and doesn't use a lock.</value>
   </data>
@@ -161,5 +162,43 @@
   </data>
   <data name="FieldDoesNotUseLockMessageFormat" xml:space="preserve">
     <value>The Accessor '{0}' in '{1}' can be called from outside its declaring class and doesn't use a lock. </value>
+  </data>
+  
+  <data name="TestRuleTitle" xml:space="preserve">
+    <value>TEST</value>
+  </data>
+  <data name="TestRuleDescription" xml:space="preserve">
+    <value>TEST</value>
+  </data>
+  <data name="TestRuleMessageFormat" xml:space="preserve">
+    <value>TEST: '{0}' ; '{1}'</value>
+  </data>
+  
+  <data name="InternalFieldNoLockTitle" xml:space="preserve">
+    <value>Field or property not properly synchronized</value>
+  </data>
+  <data name="InternalFieldNoLockDescription" xml:space="preserve">
+    <value>Internal field or property not properly synchronized</value>
+  </data>
+  <data name="InternalFieldNoLockMessageFormat" xml:space="preserve">
+    <value>The field '{0}' in '{1}' is exposed through method '{2}' without a lock</value>
+  </data>
+  <data name="LockObjectExposedTitle" xml:space="preserve">
+    <value>Lock object publicly exposed</value>
+  </data>
+  <data name="LockObjectExposedDescription" xml:space="preserve">
+    <value>A lock object is being exposed via a public accessor</value>
+  </data>
+  <data name="LockObjectExposedMessageFormat" xml:space="preserve">
+    <value>The Lock '{0}' in class '{1}' is publicly exposed via accessor '{2}'</value>
+  </data>
+  <data name="PublicFieldExposedTitle" xml:space="preserve">
+    <value>Public field exposes internal state</value>
+  </data>
+  <data name="PublicFieldExposedDescription" xml:space="preserve">
+    <value>Public fields break encapsulation. Use properties with appropriate accessor modifiers instead</value>
+  </data>
+  <data name="PublicFieldExposedMessageFormat" xml:space="preserve">
+    <value>Field '{0}' is public. {1}</value>
   </data>
 </root>
