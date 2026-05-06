@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using ThreadSafetClassAnalyser.Utils;
 
 namespace ThreadSafetClassAnalyser
 {
@@ -13,6 +14,7 @@ namespace ThreadSafetClassAnalyser
     {
         private const string Category = "CorrectlySynchronized";
 
+        // --- FieldUsed ---
         public const string FieldUsedDiagnosticId = "FieldUsed";
         private static readonly AnalyserMetadata FieldUsedMetadata = new AnalyserMetadata(FieldUsedDiagnosticId);
 
@@ -26,16 +28,50 @@ namespace ThreadSafetClassAnalyser
                 isEnabledByDefault: true,
                 description: FieldUsedMetadata.Description);
         
-        //Add your rules here.
+        // --- ConflictingAccessThread ---
+
+        private const string ConflictingAccessThreadId = "ConflictingAccessThread";
+
+        private static readonly AnalyserMetadata conflictingAccessThreadMetadata =
+            new AnalyserMetadata(ConflictingAccessThreadId);
+
+        private static readonly DiagnosticDescriptor ConflictingAccessThreadRule =
+            new DiagnosticDescriptor(
+                ConflictingAccessThreadId,
+                conflictingAccessThreadMetadata.Title,
+                conflictingAccessThreadMetadata.MessageFormat,
+                Category,
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                description: conflictingAccessThreadMetadata.Description);
+        
+        
+        // --- Test Rule ---
+        private const string TestRuleId = "TestRule";
+
+        private static readonly AnalyserMetadata TestRuleMetadata = 
+            new AnalyserMetadata(TestRuleId);
+        
+        private static readonly DiagnosticDescriptor TestRule =
+            new DiagnosticDescriptor(
+                TestRuleId,
+                TestRuleMetadata.Title,
+                TestRuleMetadata.MessageFormat,
+                Category,
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true,
+                description: TestRuleMetadata.Description
+            );
+        
+        // --- Register all supported diagnostics ---
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         {
             [DebuggerStepThrough()]
-            get
-            {
-                return ImmutableArray.Create(
-                    FieldUsedRule
+            get =>
+                ImmutableArray.Create(
+                    FieldUsedRule,
+                    ConflictingAccessThreadRule
                 );
-            }
         }
 
         public override void Initialize(AnalysisContext context)
@@ -43,9 +79,67 @@ namespace ThreadSafetClassAnalyser
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
 
-            //Register the Actions here.
+            // Register the Actions here.
             // context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
+            
+            context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInThreads, SyntaxKind.ClassDeclaration);
         }
+
+        private static void AnalyzeConflictingAccessesInThreads(SyntaxNodeAnalysisContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            
+            // Check that class was found
+            if (classSymbol == null) 
+                return;
+
+            // Guard for the [ThreadSafe] annotation
+            if (!AnalysisHelpers.IsTargetInThreadSafeClass(classSymbol))
+                return;
+            
+            // Find all thread instantiations in a class
+            var threadCreations = AnalysisHelpers.GetThreadCreationsInClass(context, semanticModel);
+            if (threadCreations is null) return;
+            
+            if (threadCreations.Count < 2) return;
+            
+            // Map each thread to the fields it accesses
+            var threadAccessMaps = threadCreations
+                .Select(tc => AnalysisHelpers.GetAccessedFields(tc, semanticModel))
+                .ToList();
+            
+            // 4. Compare every thread against every other thread 
+            for (var i = 0; i < threadAccessMaps.Count; i++)
+            {
+                for (var j = i + 1; j < threadAccessMaps.Count; j++)
+                {
+                    var conflicts = AnalysisHelpers.FindConflicts(threadAccessMaps[i], threadAccessMaps[j]);
+            
+                    var nameI = AnalysisHelpers.GetThreadName(threadCreations[i]);
+                    var nameJ = AnalysisHelpers.GetThreadName(threadCreations[j]);
+                    
+                    foreach (var conflict in conflicts)
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            ConflictingAccessThreadRule,
+                            threadCreations[i].GetLocation(), 
+                            conflict.Name,
+                            nameI,
+                            nameJ));
+                        
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            ConflictingAccessThreadRule,
+                            threadCreations[j].GetLocation(), 
+                            conflict.Name,
+                            nameJ,
+                            nameI));
+                    }
+                }
+            }
+        }
+        
         private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node; //Cast the node so it is workable.
@@ -56,16 +150,17 @@ namespace ThreadSafetClassAnalyser
             // Collect all field symbols in the class
             var fieldSymbols = classDecl.Members
                 .OfType<FieldDeclarationSyntax>()
-                .SelectMany(f => f.Declaration.Variables) //int a, b, c; // One FieldDeclarationSyntax, three VariableDeclaratorSyntax nodes
+                .SelectMany(f => f.Declaration.Variables)
                 .Select(v => semanticModel.GetDeclaredSymbol(v, context.CancellationToken))
                 .OfType<IFieldSymbol>()
-                .ToImmutableHashSet();
+                .ToImmutableHashSet<IFieldSymbol>(SymbolEqualityComparer.Default);
+            
             // Collect all property symbols in the class
             var properties = classDecl.Members
                 .OfType<PropertyDeclarationSyntax>()
                 .Select(p => semanticModel.GetDeclaredSymbol(p, context.CancellationToken))
                 .OfType<IPropertySymbol>()
-                .ToImmutableHashSet();
+                .ToImmutableHashSet<IPropertySymbol>(SymbolEqualityComparer.Default);
 
 
             //Get all method declarations in the class
@@ -125,6 +220,5 @@ namespace ThreadSafetClassAnalyser
                 }
             }
         }
-
     }
 }

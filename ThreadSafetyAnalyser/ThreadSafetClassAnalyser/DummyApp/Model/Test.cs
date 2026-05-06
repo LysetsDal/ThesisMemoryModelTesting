@@ -6,7 +6,6 @@ namespace DummyApp.Model;
 #pragma warning disable CS0414 // Field is assigned but its value is never used
 [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
-// Custom Annotation
 [ThreadSafe]
 public class Test
 {

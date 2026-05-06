@@ -188,5 +188,23 @@ namespace ThreadSafetClassAnalyser {
                 return ResourceManager.GetString("PublicFieldExposedMessageFormat", resourceCulture);
             }
         }
+        
+        internal static string ConflictingAccessThreadTitle {
+            get {
+                return ResourceManager.GetString("ConflictingAccessThreadTitle", resourceCulture);
+            }
+        }
+        
+        internal static string ConflictingAccessThreadMessageFormat {
+            get {
+                return ResourceManager.GetString("ConflictingAccessThreadMessageFormat", resourceCulture);
+            }
+        }
+        
+        internal static string ConflictingAccessThreadDescription {
+            get {
+                return ResourceManager.GetString("ConflictingAccessThreadDescription", resourceCulture);
+            }
+        }
     }
 }

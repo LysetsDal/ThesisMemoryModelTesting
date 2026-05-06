@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using ThreadSafetClassAnalyser.Utils;
 
 namespace ThreadSafetClassAnalyser
@@ -137,7 +136,7 @@ namespace ThreadSafetClassAnalyser
             
             // [External] This rule flags field or property accesses at the call site
             context.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
-
+            
             // [Internal] This rule flags public fields internally
             context.RegisterSyntaxNodeAction(AnalyzePublicFieldDeclaration, SyntaxKind.FieldDeclaration);
             
@@ -287,7 +286,7 @@ namespace ThreadSafetClassAnalyser
             var memberAccess = (MemberAccessExpressionSyntax)context.Node;
             var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
 
-            if (!AnalysisHelpers.IsTargetInThreadSafeClass(context, symbol)) return;
+            if (!AnalysisHelpers.IsTargetInThreadSafeClass(symbol)) return;
             
             var memberName = memberAccess.Name.Identifier.Text;
             var className = context.ContainingSymbol?.ContainingType;

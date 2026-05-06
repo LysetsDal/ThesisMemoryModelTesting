@@ -9,10 +9,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Folder Include="Model\" />
-    </ItemGroup>
-
-    <ItemGroup>
         <!-- Reference so we can use [ThreadSafe] annotation -->
         <ProjectReference Include="../ThreadsafeClassAnalyser.Annotations/ThreadsafeClassAnalyser.Annotations.csproj" />
         

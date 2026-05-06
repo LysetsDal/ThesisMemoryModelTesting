@@ -201,4 +201,13 @@
   <data name="PublicFieldExposedMessageFormat" xml:space="preserve">
     <value>Field '{0}' is public. {1}</value>
   </data>
+  <data name="ConflictingAccessThreadTitle" xml:space="preserve">
+    <value>(WIP) Conflicting access in Thread</value>
+  </data>
+  <data name="ConflictingAccessThreadMessageFormat" xml:space="preserve">
+    <value>(WIP) There is a conflicting access on field '{0}' in Thread '{1}' with Thread '{2}' </value>
+  </data>
+  <data name="ConflictingAccessThreadDescription" xml:space="preserve">
+    <value>(WIP) Conflicting accesses in threads</value>
+  </data>
 </root>
