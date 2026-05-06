@@ -29,7 +29,9 @@ namespace ThreadSafetClassAnalyser.Utils
         
         /// <summary>
         /// Determines if the current analysis context is within a class marked with [ThreadSafe].
+        /// Used for methods registered with 'RegisterSyntaxNodeAction()' in the Initialize method.
         /// </summary>
+        /// <param name="context">A SyntaxNodeAnalysisContext</param>
         public static bool IsInThreadSafeClass(SyntaxNodeAnalysisContext context)
         {
             // For syntax actions, the ContainingSymbol's type is the class
@@ -39,12 +41,23 @@ namespace ThreadSafetClassAnalyser.Utils
 
         /// <summary>
         /// Determines if the current symbol analysis context is for a class marked with [ThreadSafe].
+        /// Used for methods registered with 'RegisterSymbolAction()' in the Initialize method.
         /// </summary>
+        /// <param name="context">A SymbolAnalysisContext</param>
         public static bool IsInThreadSafeClass(SymbolAnalysisContext context)
         {
             // For symbol actions, the Symbol itself is often the class (NamedType)
             var classSymbol = context.Symbol as INamedTypeSymbol ?? context.Symbol.ContainingType;
             return GetThreadSafeAttribute(classSymbol) != null;
+        }
+        
+        /// <summary>
+        /// Checks if the target of a member access belongs to a [ThreadSafe] class.
+        /// Should be used for call-site warnings to check if the target class is annotated.
+        /// </summary>
+        public static bool IsTargetInThreadSafeClass(SyntaxNodeAnalysisContext context, ISymbol targetSymbol)
+        {
+            return GetThreadSafeAttribute(targetSymbol?.ContainingType) != null;
         }
         
         /// <summary>

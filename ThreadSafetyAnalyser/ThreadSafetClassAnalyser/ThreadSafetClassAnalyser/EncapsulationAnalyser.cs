@@ -215,6 +215,10 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzeCallingMemberAccessWithLock(SyntaxNodeAnalysisContext context)
         {
             var memberAccess = (MemberAccessExpressionSyntax)context.Node;
+            var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
+
+            if (!AnalysisHelpers.IsTargetInThreadSafeClass(context, symbol)) return;
+            
             var memberName = memberAccess.Name.Identifier.Text;
             var className = context.ContainingSymbol?.ContainingType;
 
@@ -227,8 +231,7 @@ namespace ThreadSafetClassAnalyser
             
             if (!(methodSymbol.ContainingSymbol is INamedTypeSymbol)) return;
             
-            LockStatementSyntax parentLock =
-                AnalysisHelpers.FindSurroundingLockFromMethodSymbol(methodSymbol);
+            var parentLock = AnalysisHelpers.FindSurroundingLockFromMethodSymbol(methodSymbol);
             
             // Pt 'dumb' only knows if a Method call has a lock somewhere inside before a method, prop or class boundary is hit
             if (parentLock == null)
