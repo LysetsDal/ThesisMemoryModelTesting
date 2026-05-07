@@ -115,13 +115,40 @@ namespace ThreadSafetClassAnalyser
             {
                 for (var j = i + 1; j < threadAccessMaps.Count; j++)
                 {
-                    var conflicts = AnalysisHelpers.FindConflicts(threadAccessMaps[i], threadAccessMaps[j]);
-            
+                    var conflicts = 
+                        AnalysisHelpers.FindConflicts(threadAccessMaps[i], threadAccessMaps[j]);
+                    
+                    var symbolI = semanticModel.GetSymbolInfo(threadCreations[i].ArgumentList.Arguments[0].Expression).Symbol;
+                    var symbolJ = semanticModel.GetSymbolInfo(threadCreations[j].ArgumentList.Arguments[0].Expression).Symbol;
+                    
+                    var classLocks =
+                        AnalysisHelpers.GetClassLockAssociationDict(classSymbol, semanticModel);
+
+                    var locksUsedByI = AnalysisHelpers.GetLockObjectsUsedInMember(classLocks, symbolI);
+                    var locksUsedByJ = AnalysisHelpers.GetLockObjectsUsedInMember(classLocks, symbolJ);
+
+                    // 5. Check for a common lock object (The Intersection)
+                    var sharesCommonLock = locksUsedByI.Intersect(locksUsedByJ, SymbolEqualityComparer.Default).Any();
+
+                    // If they share a lock, they are synchronized. Skip reporting diagnostics for this pair.
+                    if (sharesCommonLock) continue;
+                    
                     var nameI = AnalysisHelpers.GetThreadName(threadCreations[i]);
                     var nameJ = AnalysisHelpers.GetThreadName(threadCreations[j]);
-                    
+
+                    var stop = true;
                     foreach (var conflict in conflicts)
                     {
+                        var infoI = threadAccessMaps[i][conflict];
+                        var infoJ = threadAccessMaps[j][conflict];
+                        
+                        if (infoI.LockObject != null && 
+                            infoJ.LockObject != null && 
+                            SymbolEqualityComparer.Default.Equals(infoI.LockObject, infoJ.LockObject))
+                        {
+                            continue; 
+                        }
+                        
                         context.ReportDiagnostic(Diagnostic.Create(
                             ConflictingAccessThreadRule,
                             threadCreations[i].GetLocation(), 
@@ -135,87 +162,6 @@ namespace ThreadSafetClassAnalyser
                             conflict.Name,
                             nameJ,
                             nameI));
-                    }
-                }
-            }
-        }
-        
-        private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
-        {
-            var classDecl = (ClassDeclarationSyntax)context.Node; //Cast the node so it is workable.
-
-            //Need this to get the symbols for the fields and properties in the class, so we can compare them to the identifiers used in the methods.
-            var semanticModel = context.SemanticModel;
-
-            // Collect all field symbols in the class
-            var fieldSymbols = classDecl.Members
-                .OfType<FieldDeclarationSyntax>()
-                .SelectMany(f => f.Declaration.Variables)
-                .Select(v => semanticModel.GetDeclaredSymbol(v, context.CancellationToken))
-                .OfType<IFieldSymbol>()
-                .ToImmutableHashSet<IFieldSymbol>(SymbolEqualityComparer.Default);
-            
-            // Collect all property symbols in the class
-            var properties = classDecl.Members
-                .OfType<PropertyDeclarationSyntax>()
-                .Select(p => semanticModel.GetDeclaredSymbol(p, context.CancellationToken))
-                .OfType<IPropertySymbol>()
-                .ToImmutableHashSet<IPropertySymbol>(SymbolEqualityComparer.Default);
-
-
-            //Get all method declarations in the class
-            var methodDeclarations = classDecl.Members.OfType<MethodDeclarationSyntax>();
-
-            foreach (var methodDecl in methodDeclarations)
-            {
-                if (methodDecl.Body == null)
-                    continue;
-
-                var identifierNames = methodDecl.Body.DescendantNodes().OfType<IdentifierNameSyntax>();
-                foreach (var identifierName in identifierNames)
-                {
-                    var symbol = semanticModel.GetSymbolInfo(identifierName, context.CancellationToken).Symbol;
-
-                    // Check if the symbol is a field or property of this class
-                    if (symbol is IFieldSymbol fieldSymbol && fieldSymbols.Contains(fieldSymbol))
-                    {
-                        // Diagnostic at usage
-                        var usageDiagnostic = Diagnostic.Create(
-                            FieldUsedRule,
-                            identifierName.GetLocation(),
-                            identifierName.Identifier.ValueText,
-                            methodDecl.Identifier.Text);
-
-                        context.ReportDiagnostic(usageDiagnostic);
-
-                        // Diagnostic at declaration
-                        var declarationDiagnostic = Diagnostic.Create(
-                            FieldUsedRule,
-                            fieldSymbol.Locations[0],
-                            fieldSymbol.Name,
-                            methodDecl.Identifier.Text);
-
-                        context.ReportDiagnostic(declarationDiagnostic);
-                    }
-                    else if (symbol is IPropertySymbol propertySymbol && properties.Contains(propertySymbol))
-                    {
-                        // Diagnostic at usage
-                        var usageDiagnostic = Diagnostic.Create(
-                            FieldUsedRule,
-                            identifierName.GetLocation(),
-                            identifierName.Identifier.ValueText,
-                            methodDecl.Identifier.Text);
-
-                        context.ReportDiagnostic(usageDiagnostic);
-
-                        // Diagnostic at declaration
-                        var declarationDiagnostic = Diagnostic.Create(
-                            FieldUsedRule,
-                            propertySymbol.Locations[0],
-                            propertySymbol.Name,
-                            methodDecl.Identifier.Text);
-
-                        context.ReportDiagnostic(declarationDiagnostic);
                     }
                 }
             }

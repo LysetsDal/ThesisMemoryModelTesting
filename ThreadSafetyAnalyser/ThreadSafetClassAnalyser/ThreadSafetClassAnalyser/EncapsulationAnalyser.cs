@@ -300,7 +300,7 @@ namespace ThreadSafetClassAnalyser
             
             if (!(methodSymbol.ContainingSymbol is INamedTypeSymbol)) return;
             
-            var parentLock = AnalysisHelpers.FindSurroundingLockFromMethodSymbol(methodSymbol);
+            var parentLock = AnalysisHelpers.FindFirstLockFromMethodSymbol(methodSymbol);
             
             // Pt 'dumb' only knows if a Method call has a lock somewhere inside before a method, prop or class boundary is hit
             if (parentLock != null) return;

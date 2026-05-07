@@ -16,6 +16,7 @@ internal static class Program
         test.MethodWithDoubleNestedLocks();
 
         var t = new Turnstile();
-        t.Run();
+        t.TwoLockedThreads_SameLockSymbols();
+        t.TwoLockedThreads_DifferentLockSymbols();
     }
 }

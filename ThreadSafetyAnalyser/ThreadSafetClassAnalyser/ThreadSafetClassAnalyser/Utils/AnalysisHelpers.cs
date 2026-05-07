@@ -101,7 +101,10 @@ namespace ThreadSafetClassAnalyser.Utils
         /// <param name="semanticModel">The Semantic model of the classSymbol</param>
         /// <returns>A dictionary of [Key: LockSymbols, Value: <see cref="LockAssociation"/>]</returns>
         public static ImmutableDictionary<ISymbol, ImmutableArray<LockAssociation>> 
-            GetClassLockAssociationDict(INamedTypeSymbol classSymbol, SemanticModel semanticModel)
+            GetClassLockAssociationDict(
+                INamedTypeSymbol classSymbol, 
+                SemanticModel semanticModel
+                )
         {
             // Use the custom LockAssociation struct instead of Tuple
             var lockMapping = new Dictionary<ISymbol, List<LockAssociation>>(SymbolEqualityComparer.Default);
@@ -118,26 +121,40 @@ namespace ThreadSafetClassAnalyser.Utils
                 {
                     // Determine WHAT is being locked (the expression inside the parentheses)
                     var lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                    if (lockObjSymbol == null) continue;
+
                     
                     // Determine the Enclosing Member (Method, Property Accessor, Constructor, etc.)
                     var enclosingMember = lockStmt.Ancestors()
-                        .FirstOrDefault(a => a is MemberDeclarationSyntax || a is AccessorDeclarationSyntax);
+                        .FirstOrDefault(a => 
+                            a is MemberDeclarationSyntax || 
+                            a is AccessorDeclarationSyntax || 
+                            a is LambdaExpressionSyntax);
+
                     
                     // Get the Symbol for the member containing the lock
                     ISymbol memberSymbol = null;
                     if (enclosingMember != null)
                     {
-                        memberSymbol = semanticModel.GetDeclaredSymbol(enclosingMember);
+                        if (enclosingMember is LambdaExpressionSyntax lambda)
+                        {
+                            // 2. For Lambdas, use GetSymbolInfo to get the anonymous method symbol
+                            memberSymbol = semanticModel.GetSymbolInfo(lambda).Symbol;
+                        }
+                        else
+                        {
+                            // 3. For standard members, use GetDeclaredSymbol
+                            memberSymbol = semanticModel.GetDeclaredSymbol(enclosingMember);
+                        }
                     }
+                    
 
-                    if (lockObjSymbol == null) continue;
                     
                     if (!lockMapping.ContainsKey(lockObjSymbol))
                     {
                         lockMapping[lockObjSymbol] = new List<LockAssociation>();
                     }
-                        
-                    // Use the primary constructor of your new struct
+                    
                     lockMapping[lockObjSymbol].Add(new LockAssociation(memberSymbol, lockStmt));
                 }
             }
@@ -149,13 +166,12 @@ namespace ThreadSafetClassAnalyser.Utils
                 SymbolEqualityComparer.Default);
         }
         
-        
         /// <summary>
-        /// Looks ar a method outside -> in, returns the first sorrounding lock it finds inside the method.
+        /// Looks at a method and returns the first lock it finds inside the method. Single layer, doesn't recurse.
         /// </summary>
         /// <param name="methodSymbol"></param>
         /// <returns></returns>
-        public static LockStatementSyntax FindSurroundingLockFromMethodSymbol(ISymbol methodSymbol)
+        public static LockStatementSyntax FindFirstLockFromMethodSymbol(ISymbol methodSymbol)
         {
             var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
 
@@ -169,23 +185,96 @@ namespace ThreadSafetClassAnalyser.Utils
             return parentLock;
         }
         
+        /// <summary>
+        /// Finds the specific lock statement that wraps the provided syntax node.
+        /// Returns null if the node is not inside a lock block.
+        /// </summary>
+        /// <param name="node">The syntax node to search 'upwards' from in the tree.</param>
+        public static LockStatementSyntax GetSurroundingLock(SyntaxNode node)
+        {
+            foreach (var ancestor in node.Ancestors())
+            {
+                // If we hit a lock, we found it!
+                if (ancestor is LockStatementSyntax lockStatement)
+                    return lockStatement;
+
+                // If we hit a method or property boundary, stop looking.
+                // A lock outside the current method cannot "wrap" this node.
+                if (ancestor is MethodDeclarationSyntax || 
+                    ancestor is PropertyDeclarationSyntax ||
+                    ancestor is ConstructorDeclarationSyntax)
+                {
+                    return null;
+                }
+            }
+            return null;
+        }
+        
+        public static ISymbol GetSurroundingLockSymbol(SyntaxNode node, SemanticModel model)
+        {
+            var lockStmt = node.Ancestors().OfType<LockStatementSyntax>().FirstOrDefault();
+            if (lockStmt == null) return null;
+
+            // Get the symbol of what is being locked (e.g., _syncObj)
+            return model.GetSymbolInfo(lockStmt.Expression).Symbol;
+        }
+        
+        /// <summary>
+        /// Searches the class lock associations to find which lock objects (targets) 
+        /// are being used inside a specific member (method, lambda, etc.).
+        /// </summary>
+        /// <param name="lockMap">The map generated by GetClassLockAssociationDict.</param>
+        /// <param name="memberSymbol">The symbol of the method or lambda to check.</param>
+        /// <returns>A list of symbols representing the objects being locked.</returns>
+        public static IEnumerable<ISymbol> GetLockObjectsUsedInMember(
+            ImmutableDictionary<ISymbol, ImmutableArray<LockAssociation>> lockMap, 
+            ISymbol memberSymbol)
+        {
+            if (memberSymbol == null) yield break;
+
+            foreach (var entry in lockMap)
+            {
+                var lockObject = entry.Key;
+                var associations = entry.Value;
+
+                // Check if any association in this lock group belongs to our target member
+                if (associations.Any(a => SymbolEqualityComparer.Default.Equals(a.MemberContainingLock, memberSymbol)))
+                {
+                    yield return lockObject;
+                }
+            }
+        }
+        
+        
         // ========================================================================================
         // =========================== CORRECTLY SYNCHRONIZED ANALYSER ============================
         // ========================================================================================
-        public static Dictionary<ISymbol, AccessType> GetAccessedFields(ObjectCreationExpressionSyntax threadCreation, SemanticModel model)
+        public static Dictionary<ISymbol, AccessInfo> GetAccessedFields(ObjectCreationExpressionSyntax threadCreation, SemanticModel model)
         {
-            var accessed = new Dictionary<ISymbol, AccessType>(SymbolEqualityComparer.Default);
+            // Change instantiation to AccessInfo
+            var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
+    
             var lambda = threadCreation.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
 
             if (lambda == null) return accessed;
 
-            // Recursively find accesses inside the Thread lambda and any methods it calls
-            PopulateAccessesRecursive(lambda, model, accessed, new HashSet<ISymbol>(SymbolEqualityComparer.Default));
+            // Now the types match for this call
+            PopulateAccessesRecursive(
+                lambda, 
+                model, 
+                accessed, 
+                new HashSet<ISymbol>(SymbolEqualityComparer.Default),
+                null);
 
             return accessed;
         }
 
-        private static void PopulateAccessesRecursive(SyntaxNode node, SemanticModel model, IDictionary<ISymbol, AccessType> accessed, HashSet<ISymbol> visitedMethods)
+        private static void PopulateAccessesRecursive(
+            SyntaxNode node,
+            SemanticModel model, 
+            IDictionary<ISymbol, AccessInfo> accessed, 
+            HashSet<ISymbol> visitedMethods,
+            ISymbol currentLockSymbol)
         {
             // 1. Manual Scan for Fields/Properties
             var identifiers = node.DescendantNodes().OfType<IdentifierNameSyntax>();
@@ -194,28 +283,31 @@ namespace ThreadSafetClassAnalyser.Utils
                 var info = model.GetSymbolInfo(id);
                 var sym = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
 
-                if (sym != null && (sym.Kind == SymbolKind.Field || sym.Kind == SymbolKind.Property))
-                {
-                    // Determine if it's a write by checking if it's on the left side of an assignment
-                    var isWrite = IsWriteAccess(id);
-                    UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read);
-                }
+                if (sym == null ||
+                    (sym.Kind != SymbolKind.Field && sym.Kind != SymbolKind.Property)) continue;
+                
+                // Determine if it's a write by checking if it's on the left side of an assignment
+                var isWrite = IsWriteAccess(id);
+                var effectiveLock = currentLockSymbol ?? GetSurroundingLockSymbol(id, model);
+                    
+                UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock);
             }
 
             // 2. Process Invocations (Stepping into methods)
             var invocations = node.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocations)
             {
-                // Guard: Only step into methods
-                if (!(model.GetSymbolInfo(invocation).Symbol is IMethodSymbol methodSymbol))
-                    continue;
-                
+                if (!(model.GetSymbolInfo(invocation).Symbol is IMethodSymbol methodSymbol)) continue;
                 if (!visitedMethods.Add(methodSymbol)) continue;
+
+                // Check if THIS specific call is wrapped in a lock before jumping
+                var lockAtCallSite = currentLockSymbol ?? GetSurroundingLockSymbol(invocation, model);
 
                 foreach (var reference in methodSymbol.DeclaringSyntaxReferences)
                 {
                     var methodSyntax = reference.GetSyntax();
-                    PopulateAccessesRecursive(methodSyntax, model, accessed, visitedMethods);
+                    // Pass the current lock state down into the method body
+                    PopulateAccessesRecursive(methodSyntax, model, accessed, visitedMethods, lockAtCallSite);
                 }
             }
         }
@@ -235,31 +327,40 @@ namespace ThreadSafetClassAnalyser.Utils
             return false;
         }
 
-        private static void UpdateAccessMap(IDictionary<ISymbol, AccessType> map, ISymbol symbol, AccessType type)
+        private static void UpdateAccessMap(IDictionary<ISymbol, AccessInfo> map, ISymbol symbol, AccessType type, ISymbol currentLock)
         {
-            // If we already marked it as a Write, don't downgrade it to a Read
-            if (map.TryGetValue(symbol, out var existing) && existing == AccessType.Write)
-                return;
-
-            map[symbol] = type;
+            if (map.TryGetValue(symbol, out var existing))
+            {
+                if (type == AccessType.Write) existing.AccessType = AccessType.Write;
+                
+                if (!SymbolEqualityComparer.Default.Equals(existing.LockObject, currentLock))
+                {
+                    existing.LockObject = null; 
+                }
+            }
+            else
+            {
+                map[symbol] = new AccessInfo { AccessType = type, LockObject = currentLock };
+            }
         }
 
-        public static IEnumerable<ISymbol> FindConflicts(Dictionary<ISymbol, AccessType> t1, Dictionary<ISymbol, AccessType> t2)
+        public static IEnumerable<ISymbol> FindConflicts(
+            Dictionary<ISymbol, AccessInfo> t1, 
+            Dictionary<ISymbol, AccessInfo> t2)
         {
             foreach (var field in t1.Keys)
             {
-                if (!t2.TryGetValue(field, out var t2Access)) continue;
-                
-                // Conflict if: (T1 write) OR (T2 write)
-                if (t1[field] == AccessType.Write || t2Access == AccessType.Write)
+                if (!t2.TryGetValue(field, out var info2)) continue;
+                var info1 = t1[field];
+
+                // 1. Basic conflict check (at least one write)
+                if (info1.AccessType == AccessType.Write || info2.AccessType == AccessType.Write)
                 {
                     yield return field;
                 }
             }
         }
-
-        public enum AccessType { Read, Write }
-
+        
         /// <summary>
         /// Find all Thread Instantiations in a ClassDeclaration SyntaxNode 
         /// </summary>

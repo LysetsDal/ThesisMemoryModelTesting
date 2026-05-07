@@ -9,7 +9,9 @@ public class Turnstile
 
     private int otherWork = 1;
 
-
+    private readonly object _turnstileLock = new();
+    private readonly object _turnstileLock2 = new();
+    
     public int GetOtherWork()
     {
         return otherWork;
@@ -23,32 +25,54 @@ public class Turnstile
     // This method represents a turnstile spinning 1,000 times
     private void Entrance(int increments)
     {
-        for (var i = 0; i < increments; i++)
+        lock (_turnstileLock)
         {
-            // The Race Condition happens here
-            Count++; 
+            for (var i = 0; i < increments; i++)
+            {
+                // The Race Condition happens here
+                Count++;
+            }
         }
     }
 
-    public void Run()
+    // Should flag a warning
+    public void TwoLockedThreads_DifferentLockSymbols()
     {
-        // ===== Turnstile Example ===== 
-        var turnstile = new Turnstile();
-        // int incrementsPerThread = 10_000;
-
         var t1 = new Thread(() =>
         {
-            // turnstile.Entrance(incrementsPerThread);
-            var tmp = GetOtherWork();
+            lock (_turnstileLock2)
+            {
+                var tmp = GetOtherWork();
+            }
         });
         
         var t2 = new Thread(() =>
         {
-            // turnstile.Entrance(incrementsPerThread);
-            SetOtherWork(42);
+            lock (_turnstileLock)
+            {
+                SetOtherWork(42);
+            }
         });
-
-        t1.Start(); t2.Start();
-        t1.Join(); t2.Join();
+        
+    }    
+    
+    // Should flag a warning with TwoLockedThreads_DifferentLockSymbols()
+    public void TwoLockedThreads_SameLockSymbols()
+    {
+        var t3 = new Thread(() =>
+        {
+            lock (_turnstileLock)
+            {
+                var tmp = GetOtherWork();
+            }
+        });
+        
+        var t4 = new Thread(() =>
+        {
+            lock (_turnstileLock)
+            {
+                SetOtherWork(42);
+            }
+        });
     }
 }
