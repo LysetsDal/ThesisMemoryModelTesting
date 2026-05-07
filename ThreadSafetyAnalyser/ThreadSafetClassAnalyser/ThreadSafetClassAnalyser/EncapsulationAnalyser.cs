@@ -13,7 +13,6 @@ namespace ThreadSafetClassAnalyser
     public class EncapsulationAnalyser : DiagnosticAnalyzer
     {
         private const string Category = "Encapsulation";
-        private const bool UseAnnotation = false;
         
         // --- FieldAccessedExternally Rule ---
         private const string FieldAccessedExternallyDiagnosticId = "FieldAccessedExternally";
@@ -161,7 +160,7 @@ namespace ThreadSafetClassAnalyser
         // -------------------------------------------------------------------------
         private static void AnalyzeExposedClassLocks(SymbolAnalysisContext context)
         {
-            if (UseAnnotation && !AnalysisHelpers.IsInThreadSafeClass(context)) return;
+            // if (!AnalysisHelpers.IsInThreadSafeClass(context)) return;
             
             var classSymbol = (INamedTypeSymbol)context.Symbol;
             if (classSymbol.TypeKind != TypeKind.Class) return;
@@ -238,7 +237,7 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzeMemberAccess(SyntaxNodeAnalysisContext context)
         {
             // Guard Clause: Only run if annotated with: [ThreadSafe]
-            if (UseAnnotation && !AnalysisHelpers.IsInThreadSafeClass(context)) return;
+            // if (!AnalysisHelpers.IsInThreadSafeClass(context)) return;
             
             var memberAccess = (MemberAccessExpressionSyntax)context.Node;
             var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
@@ -287,7 +286,7 @@ namespace ThreadSafetClassAnalyser
             var memberAccess = (MemberAccessExpressionSyntax)context.Node;
             var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
 
-            if (UseAnnotation && !AnalysisHelpers.IsTargetInThreadSafeClass(symbol)) return;
+            // if (!AnalysisHelpers.IsTargetInThreadSafeClass(symbol)) return;
             
             var memberName = memberAccess.Name.Identifier.Text;
             var className = context.ContainingSymbol?.ContainingType;
@@ -325,7 +324,7 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzeInternalFieldAccessWithLock(SyntaxNodeAnalysisContext context)
         {
             // Guard Clause: Only run if annotated with: [ThreadSafe]
-            if (UseAnnotation && !AnalysisHelpers.IsInThreadSafeClass(context)) return;
+            // if (!AnalysisHelpers.IsInThreadSafeClass(context)) return;
             
             // 1. Find the Field
             var fieldDecl = (FieldDeclarationSyntax)context.Node;
@@ -396,7 +395,7 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzePublicFieldDeclaration(SyntaxNodeAnalysisContext context)
         {
             // Guard Clause: Only run if annotated with: [ThreadSafe]
-            if (UseAnnotation && !AnalysisHelpers.IsInThreadSafeClass(context)) return;
+            // if (!AnalysisHelpers.IsInThreadSafeClass(context)) return;
             
             var fieldDecl = (FieldDeclarationSyntax)context.Node;
             
@@ -437,7 +436,7 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzePublicPropertyDeclaration(SyntaxNodeAnalysisContext context)
         {
             // Guard Clause: Only run if annotated with: [ThreadSafe]
-            if (UseAnnotation && !AnalysisHelpers.IsInThreadSafeClass(context)) return;
+            // if (!AnalysisHelpers.IsInThreadSafeClass(context)) return;
             
             var propDecl = (PropertyDeclarationSyntax)context.Node;
             
