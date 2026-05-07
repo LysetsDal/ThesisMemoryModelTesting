@@ -1,4 +1,4 @@
-using DummyApp.Model;
+using DummyApp.Src;
 
 namespace DummyApp;
 
@@ -8,15 +8,13 @@ internal static class Program
     {
         Console.WriteLine("Hello, World!");
 
-        var test = new Test();
+        var visibility = new Visibility();
 
-        test.GetCount();
-        test.GetCountLocked();
-        
-        test.MethodWithDoubleNestedLocks();
+        visibility.GetCount();
+        visibility.GetCountLocked();
 
-        var t = new Turnstile();
-        t.TwoLockedThreads_SameLockSymbols();
-        t.TwoLockedThreads_DifferentLockSymbols();
+        var cs = new CorrectlySynchronized();
+        cs.TwoLockedThreads_SameLockSymbols();
+        cs.TwoLockedThreads_DifferentLockSymbols();
     }
 }

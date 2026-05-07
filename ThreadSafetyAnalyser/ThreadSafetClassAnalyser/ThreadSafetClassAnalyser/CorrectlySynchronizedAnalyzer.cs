@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using ThreadSafetClassAnalyser.Model;
 using ThreadSafetClassAnalyser.Utils;
 
 namespace ThreadSafetClassAnalyser
@@ -80,12 +81,23 @@ namespace ThreadSafetClassAnalyser
             context.EnableConcurrentExecution();
 
             // Register the Actions here.
-            // context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
-            
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInThreads, SyntaxKind.ClassDeclaration);
+            context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInTasks, SyntaxKind.ClassDeclaration);
         }
-
+        // =============================================================
+        // ========= CONFLICTING ACCESSES IN TASKS AND THREADS =========
+        // =============================================================
         private static void AnalyzeConflictingAccessesInThreads(SyntaxNodeAnalysisContext context)
+        {
+            AnalyzeConflictingAccessesInClass(context, KnownTypes.Thread);
+        }
+        
+        private static void AnalyzeConflictingAccessesInTasks(SyntaxNodeAnalysisContext context)
+        {
+            AnalyzeConflictingAccessesInClass(context, KnownTypes.Task);
+        }        
+        
+        private static void AnalyzeConflictingAccessesInClass(SyntaxNodeAnalysisContext context, string knownType)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node;
             var semanticModel = context.SemanticModel;
@@ -96,75 +108,83 @@ namespace ThreadSafetClassAnalyser
                 return;
 
             // Guard for the [ThreadSafe] annotation
-            // if (!AnalysisHelpers.IsTargetInThreadSafeClass(classSymbol))
-            //     return;
+            if (!Utils.Utils.IsTargetInThreadSafeClass(classSymbol)) return;
             
             // Find all thread instantiations in a class
-            var threadCreations = AnalysisHelpers.GetThreadCreationsInClass(context, semanticModel);
+            var threadCreations = Utils.Utils.GetObjectCreationsInClass(context, semanticModel, knownType);
             if (threadCreations is null) return;
             
             if (threadCreations.Count < 2) return;
             
+            var classLocks =
+                Utils.Utils.GetClassLockAssociationDict(classSymbol, semanticModel);
+            
             // Map each thread to the fields it accesses
-            var threadAccessMaps = threadCreations
-                .Select(tc => AnalysisHelpers.GetAccessedFields(tc, semanticModel))
-                .ToList();
+            var analyzedThreads = threadCreations.Select(tc => 
+            {
+                var bodyExpr = tc.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+                var bodySymbol = bodyExpr != null ? semanticModel.GetSymbolInfo(bodyExpr).Symbol : null;
+
+                return new ThreadAnalysisInfo
+                {
+                    Syntax = tc,
+                    BodySymbol = bodySymbol,
+                    Name = Utils.Utils.GetThreadName(tc),
+                    AccessMap = Utils.Utils.GetAccessedFields(tc, semanticModel),
+                    MethodScope = tc.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault(),
+                    UsedLockObjects = Utils.Utils.GetLockObjectsUsedInMember(classLocks, bodySymbol)
+                };
+            }).Where(t => t.BodySymbol != null).ToList();
             
             // 4. Compare every thread against every other thread 
-            for (var i = 0; i < threadAccessMaps.Count; i++)
+            for (var i = 0; i < analyzedThreads.Count; i++)
             {
-                for (var j = i + 1; j < threadAccessMaps.Count; j++)
+                for (var j = i + 1; j < analyzedThreads.Count; j++)
                 {
-                    var conflicts = 
-                        AnalysisHelpers.FindConflicts(threadAccessMaps[i], threadAccessMaps[j]);
-                    
-                    var symbolI = semanticModel.GetSymbolInfo(threadCreations[i].ArgumentList.Arguments[0].Expression).Symbol;
-                    var symbolJ = semanticModel.GetSymbolInfo(threadCreations[j].ArgumentList.Arguments[0].Expression).Symbol;
-                    
-                    var classLocks =
-                        AnalysisHelpers.GetClassLockAssociationDict(classSymbol, semanticModel);
+                    var t1 = analyzedThreads[i];
+                    var t2 = analyzedThreads[j];
 
-                    var locksUsedByI = AnalysisHelpers.GetLockObjectsUsedInMember(classLocks, symbolI);
-                    var locksUsedByJ = AnalysisHelpers.GetLockObjectsUsedInMember(classLocks, symbolJ);
+                    // Filter by Method Scope (Only sibling threads)
+                    if (t1.MethodScope != t2.MethodScope) continue;
 
-                    // 5. Check for a common lock object (The Intersection)
-                    var sharesCommonLock = locksUsedByI.Intersect(locksUsedByJ, SymbolEqualityComparer.Default).Any();
+                    // Macro-check: Do they share a common lock at the top level?
+                    if (t1.UsedLockObjects
+                        .Intersect(t2.UsedLockObjects, SymbolEqualityComparer.Default).Any())
+                        continue;
 
-                    // If they share a lock, they are synchronized. Skip reporting diagnostics for this pair.
-                    if (sharesCommonLock) continue;
-                    
-                    var nameI = AnalysisHelpers.GetThreadName(threadCreations[i]);
-                    var nameJ = AnalysisHelpers.GetThreadName(threadCreations[j]);
+                    // Find conflicts using the AccessMaps
+                    var conflicts = Utils.Utils.FindConflicts(t1.AccessMap, t2.AccessMap);
 
-                    var stop = true;
                     foreach (var conflict in conflicts)
                     {
-                        var infoI = threadAccessMaps[i][conflict];
-                        var infoJ = threadAccessMaps[j][conflict];
-                        
-                        if (infoI.LockObject != null && 
-                            infoJ.LockObject != null && 
-                            SymbolEqualityComparer.Default.Equals(infoI.LockObject, infoJ.LockObject))
-                        {
-                            continue; 
-                        }
-                        
-                        context.ReportDiagnostic(Diagnostic.Create(
-                            ConflictingAccessThreadRule,
-                            threadCreations[i].GetLocation(), 
-                            conflict.Name,
-                            nameI,
-                            nameJ));
-                        
-                        context.ReportDiagnostic(Diagnostic.Create(
-                            ConflictingAccessThreadRule,
-                            threadCreations[j].GetLocation(), 
-                            conflict.Name,
-                            nameJ,
-                            nameI));
+                        // Micro-check: Is this specific field protected by the same lock?
+                        var info1 = t1.AccessMap[conflict];
+                        var info2 = t2.AccessMap[conflict];
+
+                        if (Utils.Utils.IsCorrectlySynchronized(info1, info2)) continue;
+
+                        // Report
+                        ReportThreadConflict(context, t1, t2, conflict.Name);
                     }
                 }
             }
+        }
+        
+        private static void ReportThreadConflict(
+            SyntaxNodeAnalysisContext context, 
+            ThreadAnalysisInfo t1, 
+            ThreadAnalysisInfo t2, 
+            string fieldName)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                ConflictingAccessThreadRule,
+                t1.Syntax.GetLocation(),
+                fieldName, t1.Name, t2.Name));
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                ConflictingAccessThreadRule,
+                t2.Syntax.GetLocation(),
+                fieldName, t2.Name, t1.Name));
         }
     }
 }

@@ -1,4 +1,4 @@
-namespace DommyApp.Interfaces;
+namespace DummyApp.Interfaces;
 
 public interface IUser
 {

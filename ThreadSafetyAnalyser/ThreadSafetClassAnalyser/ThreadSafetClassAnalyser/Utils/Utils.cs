@@ -10,7 +10,7 @@ using ThreadSafetClassAnalyser.Model;
 
 namespace ThreadSafetClassAnalyser.Utils
 {
-    public static class AnalysisHelpers
+    public static class Utils
     {
         /// <summary>
         /// Helper method that determines if a field, prop or other member belongs to a class.
@@ -186,33 +186,23 @@ namespace ThreadSafetClassAnalyser.Utils
         }
         
         /// <summary>
-        /// Finds the specific lock statement that wraps the provided syntax node.
-        /// Returns null if the node is not inside a lock block.
+        /// Searches upwards through the syntax tree from the specified node to find the 
+        /// nearest enclosing <see cref="LockStatementSyntax"/>. If found, it retrieves 
+        /// the symbol of the object used as the lock target.
         /// </summary>
-        /// <param name="node">The syntax node to search 'upwards' from in the tree.</param>
-        public static LockStatementSyntax GetSurroundingLock(SyntaxNode node)
+        /// <param name="node">The syntax node from which to begin searching upwards.</param>
+        /// <param name="model">The semantic model used to resolve the symbol of the lock expression.</param>
+        /// <returns>
+        /// The <see cref="ISymbol"/> representing the object being locked e.g. 'object _lock = new()', 
+        /// or <c>null</c> if the node is not contained within a lock statement or the symbol cannot be resolved.
+        /// </returns>
+        private static ISymbol GetSurroundingLockSymbol(SyntaxNode node, SemanticModel model)
         {
-            foreach (var ancestor in node.Ancestors())
-            {
-                // If we hit a lock, we found it!
-                if (ancestor is LockStatementSyntax lockStatement)
-                    return lockStatement;
-
-                // If we hit a method or property boundary, stop looking.
-                // A lock outside the current method cannot "wrap" this node.
-                if (ancestor is MethodDeclarationSyntax || 
-                    ancestor is PropertyDeclarationSyntax ||
-                    ancestor is ConstructorDeclarationSyntax)
-                {
-                    return null;
-                }
-            }
-            return null;
-        }
-        
-        public static ISymbol GetSurroundingLockSymbol(SyntaxNode node, SemanticModel model)
-        {
-            var lockStmt = node.Ancestors().OfType<LockStatementSyntax>().FirstOrDefault();
+            var lockStmt = node
+                .Ancestors()
+                .OfType<LockStatementSyntax>()
+                .FirstOrDefault();
+            
             if (lockStmt == null) return null;
 
             // Get the symbol of what is being locked (e.g., _syncObj)
@@ -362,12 +352,13 @@ namespace ThreadSafetClassAnalyser.Utils
         }
         
         /// <summary>
-        /// Find all Thread Instantiations in a ClassDeclaration SyntaxNode 
+        /// Find all ObjectCreationsExpressions from the <see cref="context"/> nodes Descendant nodes.
         /// </summary>
-        /// <param name="context">The current SyntaxNodeAnalysisContext</param>
-        /// <param name="semanticModel">The current nodes Semantic Model</param>
-        /// <returns></returns>
-        public static List<ObjectCreationExpressionSyntax> GetThreadCreationsInClass(SyntaxNodeAnalysisContext context, SemanticModel semanticModel)
+        /// <param name="context">The current SyntaxNodeAnalysisContext.</param>
+        /// <param name="semanticModel">The current nodes Semantic model.</param>
+        /// <param name="typeSymbol"> A typePrefix from the <see cref="KnownTypes"/> file (e.g. Thread or Task).</param>
+        /// <returns>A list of all ObjectCreationExpressionSyntax of type <see cref="KnownTypes"/> in the class.</returns>
+        public static List<ObjectCreationExpressionSyntax> GetObjectCreationsInClass(SyntaxNodeAnalysisContext context, SemanticModel semanticModel, string typeSymbol)
         {
             if (!(context.Node is ClassDeclarationSyntax classDecl)) return null;
             
@@ -375,9 +366,17 @@ namespace ThreadSafetClassAnalyser.Utils
                 .OfType<ObjectCreationExpressionSyntax>()
                 .Where(oc => {
                     var type = semanticModel.GetTypeInfo(oc).Type;
-                    return type?.Name.Contains(KnownTypes.Thread) == true;
+                    return type?.Name.Contains(typeSymbol) == true;
                 })
                 .ToList();
+        }
+
+        
+        public static bool IsCorrectlySynchronized(AccessInfo info1, AccessInfo info2)
+        {
+            return info1.LockObject != null && 
+                   info2.LockObject != null && 
+                   SymbolEqualityComparer.Default.Equals(info1.LockObject, info2.LockObject);
         }
         
         
