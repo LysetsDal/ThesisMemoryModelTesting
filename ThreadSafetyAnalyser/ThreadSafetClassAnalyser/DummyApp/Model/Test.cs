@@ -3,10 +3,9 @@ using Annotations;
 
 namespace DummyApp.Model;
 
-#pragma warning disable CS0414 // Field is assigned but its value is never used
-[SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
+// #pragma warning disable CS0414 // Field is assigned but its value is never used
+// [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
-// Custom Annotation
 [ThreadSafe]
 public class Test
 {
@@ -64,10 +63,8 @@ public class Test
     
     public void SetCountLocked(int count)
     {
-        lock (_anotherLock)
-        {
+
             _count = count;
-        }
     }
     
     public int GetCount()
@@ -102,4 +99,5 @@ public class Test
         //TODO: What should we do when two rules are violated on the same location?
         return _anotherLock;
     }
+    
 }

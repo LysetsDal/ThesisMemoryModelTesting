@@ -14,5 +14,9 @@ internal static class Program
         test.GetCountLocked();
         
         test.MethodWithDoubleNestedLocks();
+
+        var t = new Turnstile();
+        t.TwoLockedThreads_SameLockSymbols();
+        t.TwoLockedThreads_DifferentLockSymbols();
     }
 }
