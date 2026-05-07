@@ -201,4 +201,22 @@
   <data name="PublicFieldExposedMessageFormat" xml:space="preserve">
     <value>Field '{0}' is public. {1}</value>
   </data>
+  <data name="SP001Title" xml:space="preserve">
+    <value>Field is not safely published</value>
+  </data>
+  <data name="SP001MessageFormat" xml:space="preserve">
+    <value>Field '{0}' is not safely published. Declare it as 'readonly' or 'volatile' to ensure safe publication.</value>
+  </data>
+  <data name="SP001Description" xml:space="preserve">
+    <value>All fields should be safely published by being readonly, volatile, or initialized to a default value without relying on constructor logic.</value>
+  </data>
+  <data name="SP003Title" xml:space="preserve">
+    <value>Virtual method called in constructor</value>
+  </data>
+  <data name="SP003MessageFormat" xml:space="preserve">
+    <value>Constructor of '{0}' calls virtual method '{1}'. A derived class override may run before the derived constructor body, observing uninitialized fields.</value>
+  </data>
+  <data name="SP003Description" xml:space="preserve">
+    <value>Calling a virtual method in a constructor is unsafe when a derived class overrides it and reads fields that are set in the derived constructor body, not in initializers.</value>
+  </data>
 </root>
