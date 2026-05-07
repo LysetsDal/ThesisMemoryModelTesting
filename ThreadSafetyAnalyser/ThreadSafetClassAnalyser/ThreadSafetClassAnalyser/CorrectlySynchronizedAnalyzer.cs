@@ -13,6 +13,7 @@ namespace ThreadSafetClassAnalyser
     public class CorrectlySynchronizedAnalyzer : DiagnosticAnalyzer
     {
         private const string Category = "CorrectlySynchronized";
+        private const bool UseAnnotation = false;
 
         // --- FieldUsed ---
         public const string FieldUsedDiagnosticId = "FieldUsed";
@@ -96,7 +97,7 @@ namespace ThreadSafetClassAnalyser
                 return;
 
             // Guard for the [ThreadSafe] annotation
-            if (!AnalysisHelpers.IsTargetInThreadSafeClass(classSymbol))
+            if (UseAnnotation && !AnalysisHelpers.IsTargetInThreadSafeClass(classSymbol))
                 return;
             
             // Find all thread instantiations in a class
