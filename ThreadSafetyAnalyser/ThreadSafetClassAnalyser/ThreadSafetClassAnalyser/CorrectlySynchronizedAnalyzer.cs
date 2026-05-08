@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using ThreadSafetClassAnalyser.Model;
+using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
 
 namespace ThreadSafetClassAnalyser
@@ -13,77 +14,28 @@ namespace ThreadSafetClassAnalyser
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class CorrectlySynchronizedAnalyzer : DiagnosticAnalyzer
     {
-        private const string Category = "CorrectlySynchronized";
-
-        // --- FieldUsed ---
-        public const string FieldUsedDiagnosticId = "FieldUsed";
-        private static readonly AnalyserMetadata FieldUsedMetadata = new AnalyserMetadata(FieldUsedDiagnosticId);
-
-        private static readonly DiagnosticDescriptor FieldUsedRule =
-            new DiagnosticDescriptor(
-                FieldUsedDiagnosticId,
-                FieldUsedMetadata.Title,
-                FieldUsedMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: FieldUsedMetadata.Description);
-        
-        // --- ConflictingAccessThread ---
-
-        private const string ConflictingAccessThreadId = "ConflictingAccessThread";
-
-        private static readonly AnalyserMetadata conflictingAccessThreadMetadata =
-            new AnalyserMetadata(ConflictingAccessThreadId);
-
-        private static readonly DiagnosticDescriptor ConflictingAccessThreadRule =
-            new DiagnosticDescriptor(
-                ConflictingAccessThreadId,
-                conflictingAccessThreadMetadata.Title,
-                conflictingAccessThreadMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: conflictingAccessThreadMetadata.Description);
-        
-        
-        // --- Test Rule ---
-        private const string TestRuleId = "TestRule";
-
-        private static readonly AnalyserMetadata TestRuleMetadata = 
-            new AnalyserMetadata(TestRuleId);
-        
-        private static readonly DiagnosticDescriptor TestRule =
-            new DiagnosticDescriptor(
-                TestRuleId,
-                TestRuleMetadata.Title,
-                TestRuleMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: TestRuleMetadata.Description
-            );
-        
         // --- Register all supported diagnostics ---
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
-        {
-            [DebuggerStepThrough()]
-            get =>
-                ImmutableArray.Create(
-                    FieldUsedRule,
-                    ConflictingAccessThreadRule
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+            ImmutableArray.Create(
+                    CorrectlySynchronizedRules.ConflictingAccessThreadRule
                 );
-        }
-
+        
         public override void Initialize(AnalysisContext context)
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
 
             // Register the Actions here.
+            // [Internal] (ConflictingAccessThreadRule)
+            // Flags Conflicting accesses on class fields and properties in Thread bodies
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInThreads, SyntaxKind.ClassDeclaration);
+            
+            // [Internal] (ConflictingAccessThreadRule)
+            // Flags Conflicting accesses on class fields and properties in Task bodies
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInTasks, SyntaxKind.ClassDeclaration);
+            
         }
+        
         // =============================================================
         // ========= CONFLICTING ACCESSES IN TASKS AND THREADS =========
         // =============================================================
@@ -104,8 +56,7 @@ namespace ThreadSafetClassAnalyser
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
             
             // Check that class was found
-            if (classSymbol == null) 
-                return;
+            if (classSymbol == null) return;
 
             // Guard for the [ThreadSafe] annotation
             if (!AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) return;
@@ -162,8 +113,7 @@ namespace ThreadSafetClassAnalyser
                         var info2 = t2.AccessMap[conflict];
 
                         if (AnalyzerUtils.IsCorrectlySynchronized(info1, info2)) continue;
-
-                        // Report
+                        
                         ReportThreadConflict(context, t1, t2, conflict.Name);
                     }
                 }
@@ -177,12 +127,12 @@ namespace ThreadSafetClassAnalyser
             string fieldName)
         {
             context.ReportDiagnostic(Diagnostic.Create(
-                ConflictingAccessThreadRule,
+                CorrectlySynchronizedRules.ConflictingAccessThreadRule,
                 t1.Syntax.GetLocation(),
                 fieldName, t1.Name, t2.Name));
 
             context.ReportDiagnostic(Diagnostic.Create(
-                ConflictingAccessThreadRule,
+                CorrectlySynchronizedRules.ConflictingAccessThreadRule,
                 t2.Syntax.GetLocation(),
                 fieldName, t2.Name, t1.Name));
         }

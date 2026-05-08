@@ -22,11 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="External\" />
-    <Folder Include="Internal\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\ThreadsafeClassAnalyser.Annotations\ThreadsafeClassAnalyser.Annotations.csproj" />
   </ItemGroup>
 

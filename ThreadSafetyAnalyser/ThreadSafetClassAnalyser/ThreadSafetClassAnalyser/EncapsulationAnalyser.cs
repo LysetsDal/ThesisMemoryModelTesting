@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
 
 namespace ThreadSafetClassAnalyser
@@ -12,120 +13,17 @@ namespace ThreadSafetClassAnalyser
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class EncapsulationAnalyser : DiagnosticAnalyzer
     {
-        private const string Category = "Encapsulation";
-        
-        // --- FieldAccessedExternally Rule ---
-        private const string FieldAccessedExternallyDiagnosticId = "FieldAccessedExternally";
-        private static readonly AnalyserMetadata FieldAccessedExternallyMetadata = 
-            new AnalyserMetadata(FieldAccessedExternallyDiagnosticId);
-        
-        private static readonly DiagnosticDescriptor FieldAccessedExternallyRule =
-            new DiagnosticDescriptor(
-                FieldAccessedExternallyDiagnosticId,
-                FieldAccessedExternallyMetadata.Title,
-                FieldAccessedExternallyMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: FieldAccessedExternallyMetadata.Description);
-
-        // --- PublicFieldExposed Rule ---
-        private const string PublicFieldExposedDiagnosticId = "PublicFieldExposed";
-
-        private static readonly AnalyserMetadata PublicFieldExposedMetadata =
-            new AnalyserMetadata(PublicFieldExposedDiagnosticId);
-        
-        private static readonly DiagnosticDescriptor PublicFieldExposedRule =
-            new DiagnosticDescriptor(
-                PublicFieldExposedDiagnosticId,
-                PublicFieldExposedMetadata.Title,
-                PublicFieldExposedMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                PublicFieldExposedMetadata.Description);
-
-        // --- FieldDoesNotUseLock Rule ---
-        private const string FieldDoesNotUseLockId = "FieldDoesNotUseLock";
-
-        private static readonly AnalyserMetadata FieldDoesNotUseLockMetadata =
-            new AnalyserMetadata(FieldDoesNotUseLockId);
-
-        private static readonly DiagnosticDescriptor FieldDoesNotUseLockRule =
-            new DiagnosticDescriptor(
-                FieldDoesNotUseLockId,
-                FieldDoesNotUseLockMetadata.Title,
-                FieldDoesNotUseLockMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: FieldAccessedExternallyMetadata.Description
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => 
+            ImmutableArray.Create(
+                EncapsulationRules.FieldAccessedExternallyRule,
+                EncapsulationRules.PublicFieldExposedRule,
+                EncapsulationRules.FieldDoesNotUseLockRule,
+                EncapsulationRules.InternalFieldNoLockRule,
+                EncapsulationRules.LockObjectExposedRule,
+                EncapsulationRules.TestRuleRule
             );
         
-        // --- InternalFieldNoLock ---
-        private const string InternalFieldNoLockId = "InternalFieldNoLock";
 
-        private static readonly AnalyserMetadata InternalFieldNoLockMetadata =
-            new AnalyserMetadata(InternalFieldNoLockId);
-        
-        private static readonly DiagnosticDescriptor InternalFieldNoLockRule =
-            new DiagnosticDescriptor(
-                InternalFieldNoLockId,
-                InternalFieldNoLockMetadata.Title,
-                InternalFieldNoLockMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: InternalFieldNoLockMetadata.Description
-            );        
-        
-        // --- Lock Object Exposed via Public Accessor ---
-        private const string LockObjectExposedId = "LockObjectExposed";
-
-        private static readonly AnalyserMetadata lockObjectExposedMetadata =
-            new AnalyserMetadata(LockObjectExposedId);
-        
-        private static readonly DiagnosticDescriptor LockObjectExposedRule =
-            new DiagnosticDescriptor(
-                LockObjectExposedId,
-                lockObjectExposedMetadata.Title,
-                lockObjectExposedMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: lockObjectExposedMetadata.Description
-            );
-        
-        // --- Test Rule ---
-        private const string TestRuleId = "TestRule";
-
-        private static readonly AnalyserMetadata TestRuleMetadata = 
-            new AnalyserMetadata(TestRuleId);
-        
-        private static readonly DiagnosticDescriptor TestRule =
-            new DiagnosticDescriptor(
-                TestRuleId,
-                TestRuleMetadata.Title,
-                TestRuleMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: TestRuleMetadata.Description
-            );
-        
-        // --- Register all supported diagnostics ---
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics {
-            [DebuggerStepThrough]
-            get =>
-                ImmutableArray.Create(
-                    FieldAccessedExternallyRule,
-                    PublicFieldExposedRule,
-                    InternalFieldNoLockRule,
-                    FieldDoesNotUseLockRule,
-                    LockObjectExposedRule,
-                    TestRule
-                );
-        }
         
         // Internal = The diagnostic message is internally visible inside the class with the field or method.
         // External = The diagnostic rule is externally visible (at the call-site class) but not inside the class with the field or method.
@@ -134,24 +32,29 @@ namespace ThreadSafetClassAnalyser
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
             
-            // [External] This rule flags field or property accesses at the call site
+            // [External] (FieldAccessedExternallyRule)
+            // This rule flags field or property accesses at the call site
             context.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
             
-            // [Internal] This rule flags public fields internally
+            // [Internal] (PublicFieldExposedRule)
+            // This rule flags public fields internally
             context.RegisterSyntaxNodeAction(AnalyzePublicFieldDeclaration, SyntaxKind.FieldDeclaration);
             
-            // [Internal] This rule flags public properties with public accessor modifiers internally.
+            // [Internal] (PublicFieldExposedRule) Prop
+            // This rule flags public properties with public accessor modifiers internally.
             context.RegisterSyntaxNodeAction(AnalyzePublicPropertyDeclaration, SyntaxKind.PropertyDeclaration);
             
-            // [External] This rule flags Methods at the callsite, if they don't use an accessor with a lock.
+            // [External] (FieldDoesNotUseLockRule)
+            // This rule flags Methods at the callsite, if they don't use an accessor with a lock.
             context.RegisterSyntaxNodeAction(AnalyzeCallingMemberAccessWithLock, SyntaxKind.SimpleMemberAccessExpression);
             
-            // [Internal] This rule flags fields internally, if they have public accessors without synchronization.
+            // [Internal] (InternalFieldNoLockRule)
+            // This rule flags fields internally, if they have public accessors without synchronization.
             context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.FieldDeclaration);
             
-            // [Internal] Finds all locks in a namedType (a class) that are exposed through public accessor.
+            // [Internal] (LockObjectExposedRule)
+            // Finds all locks in a namedType (a class) that are exposed through public accessor.
             context.RegisterSymbolAction(AnalyzeExposedClassLocks, SymbolKind.NamedType);
-            
             
         }
         
@@ -183,8 +86,6 @@ namespace ThreadSafetClassAnalyser
     
                 // Only flag if the member is Public
                 if (member.DeclaredAccessibility != Accessibility.Public) continue;
-
-                var b1 = true;
                 
                 foreach (var syntaxRef in member.DeclaringSyntaxReferences)
                 {
@@ -224,7 +125,7 @@ namespace ThreadSafetClassAnalyser
             if (returnedSymbol == null || !lockSymbols.Contains(returnedSymbol)) return;
             
             var diagnostic = Diagnostic.Create(
-                LockObjectExposedRule, 
+                EncapsulationRules.LockObjectExposedRule, 
                 expression.GetLocation(), 
                 returnedSymbol.Name,
                 className,
@@ -261,7 +162,7 @@ namespace ThreadSafetClassAnalyser
                 return;
                 
             var diagnostic = Diagnostic.Create(
-                FieldAccessedExternallyRule,
+                EncapsulationRules.FieldAccessedExternallyRule,
                 memberAccess.Name.GetLocation(),
                 $"{symbol.Name} is in source: {symbol.Locations[0].IsInSource} is in metadata {symbol.Locations[0].IsInMetadata}",
                 containingType.Name);
@@ -277,7 +178,7 @@ namespace ThreadSafetClassAnalyser
 
             // Now report the diagnostic at the precise declaration location
             var declarationDiagnostic = Diagnostic.Create(
-                FieldAccessedExternallyRule,
+                EncapsulationRules.FieldAccessedExternallyRule,
                 location,
                 symbol.Name,
                 symbol.ContainingType.Name);
@@ -308,14 +209,20 @@ namespace ThreadSafetClassAnalyser
             
             if (!(methodSymbol.ContainingSymbol is INamedTypeSymbol)) return;
             
-            var parentLock = AnalyzerUtils.FindFirstLockFromMethodSymbol(methodSymbol);
-            
+            // Find any locks inside method call
+            var methodDescendantLock = AnalyzerUtils.FindFirstDescendantLockFromMethodSymbol(methodSymbol);
             // Pt 'dumb' only knows if a Method call has a lock somewhere inside before a method, prop or class boundary is hit
-            if (parentLock != null) return;
+            if (methodDescendantLock != null) return;
+            
+            // Does the current context have an ancestor lock around it?
+            var callSiteAncestorLock = 
+                AnalyzerUtils.GetFirstAncestorLockFromSymbol(memberAccess, context.SemanticModel);
+            // If it does it is safe
+            if (callSiteAncestorLock != null) return;
             
             // No lock found at all!
             var diagnostic = Diagnostic.Create(
-                FieldDoesNotUseLockRule,
+                EncapsulationRules.FieldDoesNotUseLockRule,
                 memberAccess.Name.GetLocation(),
                 memberName,
                 className);
@@ -326,7 +233,8 @@ namespace ThreadSafetClassAnalyser
         
         
         /// <summary>
-        /// Analyses if a field in a source class can be accessed through any field usages without a lock. Warning is displayed internally in the class.
+        /// Analyses if a field in a source class can be accessed through any field usages without a lock.
+        /// Warning is displayed internally in the class.
         /// </summary>
         /// <param name="context"> A FieldDeclarationSyntax node from the root analysis context </param> 
         private static void AnalyzeInternalFieldAccessWithLock(SyntaxNodeAnalysisContext context)
@@ -339,8 +247,7 @@ namespace ThreadSafetClassAnalyser
             var className = context.ContainingSymbol?.ContainingType.ContainingSymbol;
             
             // Rule does not apply to Interfaces, Records or Structs
-            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context))
-                return;
+            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
 
             // Get First variable (i.e. 'public int a, b, c' is not allowed)
             var variableDeclaration = AnalyzerUtils.GetFirstVariableInFieldDeclaration(fieldDecl);
@@ -396,7 +303,7 @@ namespace ThreadSafetClassAnalyser
                     
                 // REPORT: Field access is not protected!
                 var diagnostic = Diagnostic.Create(
-                    InternalFieldNoLockRule,
+                    EncapsulationRules.InternalFieldNoLockRule,
                     usage.GetLocation(),
                     fieldSymbol.Name, // Internal field name
                     className,                         // Declaring class name
@@ -418,12 +325,10 @@ namespace ThreadSafetClassAnalyser
             var fieldDecl = (FieldDeclarationSyntax)context.Node;
             
             // Rule does not apply to Interfaces, Records or Structs
-            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context))
-                return;
+            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
             
             // Only care about public fields
-            if (!fieldDecl.Modifiers.Any(SyntaxKind.PublicKeyword))
-                return;
+            if (!fieldDecl.Modifiers.Any(SyntaxKind.PublicKeyword)) return;
 
             foreach (var variable in fieldDecl.Declaration.Variables)
             {
@@ -431,15 +336,14 @@ namespace ThreadSafetClassAnalyser
                 if (symbol == null) continue;
 
                 // Constants and static readonly fields are generally acceptable
-                if (symbol.IsConst || (symbol.IsStatic && symbol.IsReadOnly))
-                    continue;
+                if (symbol.IsConst || (symbol.IsStatic && symbol.IsReadOnly)) continue;
 
                 var detail = symbol.IsReadOnly
                     ? "Field is readonly — consider exposing via a read-only property."
                     : "Field has no accessor control. Consider wrapping it in a property with a restricted setter.";
 
                 var diagnostic = Diagnostic.Create(
-                    PublicFieldExposedRule,
+                    EncapsulationRules.PublicFieldExposedRule,
                     variable.GetLocation(),
                     symbol.Name,
                     detail);
@@ -459,15 +363,13 @@ namespace ThreadSafetClassAnalyser
             var propDecl = (PropertyDeclarationSyntax)context.Node;
             
             // Rule does not apply to Interfaces, Records or Structs
-            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context))
-                return;
+            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
             
             // Only care about public properties
-            if (!propDecl.Modifiers.Any(SyntaxKind.PublicKeyword))
-                return;
+            if (!propDecl.Modifiers.Any(SyntaxKind.PublicKeyword)) return;
 
-            if (propDecl.AccessorList == null)
-                return; // expression-bodied property — read-only by nature, skip
+            // expression-bodied property — read-only by nature, skip
+            if (propDecl.AccessorList == null) return; 
 
             var accessors = propDecl.AccessorList.Accessors;
 
@@ -476,8 +378,7 @@ namespace ThreadSafetClassAnalyser
                 var isSetter = accessor.IsKind(SyntaxKind.SetAccessorDeclaration);
                 var isIniter = accessor.IsKind(SyntaxKind.InitAccessorDeclaration);
 
-                if (!isSetter && !isIniter)
-                    continue;
+                if (!isSetter && !isIniter) continue;
 
                 // Auto-generated accessor: no body and no modifiers
                 var isAutoGenerated = accessor.Body == null && accessor.ExpressionBody == null;
@@ -486,28 +387,28 @@ namespace ThreadSafetClassAnalyser
                 if (isAutoGenerated && hasNoModifier)
                 {
                     // Public property with auto-generated public setter — fully open
-                    var diagnostic = Diagnostic.Create(
-                        PublicFieldExposedRule,
+                    context.ReportDiagnostic(
+                        Diagnostic.Create(
+                        EncapsulationRules.PublicFieldExposedRule,
                         accessor.GetLocation(),
                         propDecl.Identifier.Text,
-                        "Property has an auto-generated public setter with no access restriction (e.g. 'private set' or 'protected set').");
-
-                    context.ReportDiagnostic(diagnostic);
+                        "Property has an auto-generated public setter with no access restriction (e.g. 'private set' or 'protected set')."
+                    ));
                 }
-                else if (!hasNoModifier)
-                {
-                    // Accessor has an explicit modifier — report it informatively
-                    var modifierText = string.Join(" ", accessor.Modifiers.Select(m => m.Text));
-                    var accessorKind = isSetter ? "setter" : "init accessor";
 
-                    var diagnostic = Diagnostic.Create(
-                        PublicFieldExposedRule,
-                        accessor.GetLocation(),
-                        propDecl.Identifier.Text,
-                        $"Property {accessorKind} is explicitly marked '{modifierText}'.");
-
-                    context.ReportDiagnostic(diagnostic);
-                }
+                if (hasNoModifier) continue;
+                
+                // Accessor has an explicit modifier — report it informatively
+                var modifierText = string.Join(" ", accessor.Modifiers.Select(m => m.Text));
+                var accessorKind = isSetter ? "setter" : "init accessor";
+                
+                context.ReportDiagnostic(
+                    Diagnostic.Create(
+                    EncapsulationRules.PublicFieldExposedRule,
+                    accessor.GetLocation(),
+                    propDecl.Identifier.Text,
+                    $"Property {accessorKind} is explicitly marked '{modifierText}'."
+                ));
             }
         }
     }

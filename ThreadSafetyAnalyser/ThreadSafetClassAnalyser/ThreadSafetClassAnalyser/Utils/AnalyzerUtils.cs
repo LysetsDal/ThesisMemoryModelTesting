@@ -171,7 +171,7 @@ namespace ThreadSafetClassAnalyser.Utils
         /// </summary>
         /// <param name="methodSymbol"></param>
         /// <returns></returns>
-        public static LockStatementSyntax FindFirstLockFromMethodSymbol(ISymbol methodSymbol)
+        public static LockStatementSyntax FindFirstDescendantLockFromMethodSymbol(ISymbol methodSymbol)
         {
             var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
 
@@ -196,7 +196,7 @@ namespace ThreadSafetClassAnalyser.Utils
         /// The <see cref="ISymbol"/> representing the object being locked e.g. 'object _lock = new()', 
         /// or <c>null</c> if the node is not contained within a lock statement or the symbol cannot be resolved.
         /// </returns>
-        private static ISymbol GetSurroundingLockSymbol(SyntaxNode node, SemanticModel model)
+        public static ISymbol GetFirstAncestorLockFromSymbol(SyntaxNode node, SemanticModel model)
         {
             var lockStmt = node
                 .Ancestors()
@@ -278,7 +278,7 @@ namespace ThreadSafetClassAnalyser.Utils
                 
                 // Determine if it's a write by checking if it's on the left side of an assignment
                 var isWrite = IsWriteAccess(id);
-                var effectiveLock = currentLockSymbol ?? GetSurroundingLockSymbol(id, model);
+                var effectiveLock = currentLockSymbol ?? GetFirstAncestorLockFromSymbol(id, model);
                     
                 UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock);
             }
@@ -291,7 +291,7 @@ namespace ThreadSafetClassAnalyser.Utils
                 if (!visitedMethods.Add(methodSymbol)) continue;
 
                 // Check if THIS specific call is wrapped in a lock before jumping
-                var lockAtCallSite = currentLockSymbol ?? GetSurroundingLockSymbol(invocation, model);
+                var lockAtCallSite = currentLockSymbol ?? GetFirstAncestorLockFromSymbol(invocation, model);
 
                 foreach (var reference in methodSymbol.DeclaringSyntaxReferences)
                 {
