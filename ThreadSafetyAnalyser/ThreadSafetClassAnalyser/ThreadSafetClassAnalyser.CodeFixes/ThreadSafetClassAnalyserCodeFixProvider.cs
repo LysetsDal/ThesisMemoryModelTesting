@@ -12,6 +12,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Rename;
 using Microsoft.CodeAnalysis.Text;
+using ThreadSafetClassAnalyser.Rules;
 
 namespace ThreadSafetClassAnalyser
 {
@@ -22,7 +23,7 @@ namespace ThreadSafetClassAnalyser
         {
             get { return ImmutableArray.Create(
                 ThreadSafetClassAnalyserAnalyzer.DiagnosticId,
-                CorrectlySynchronizedAnalyzer.FieldUsedDiagnosticId); }
+                CorrectlySynchronizedRules.FieldUsedDiagnosticId); }
         }
 
         public sealed override FixAllProvider GetFixAllProvider()
@@ -49,7 +50,7 @@ namespace ThreadSafetClassAnalyser
                         equivalenceKey: nameof(CodeFixResources.CodeFixTitle)),
                     diagnostic);
             }
-            else if (diagnostic.Id == CorrectlySynchronizedAnalyzer.FieldUsedDiagnosticId)
+            else if (diagnostic.Id == CorrectlySynchronizedRules.FieldUsedDiagnosticId)
             {
                 context.RegisterCodeFix(
                     CodeAction.Create(

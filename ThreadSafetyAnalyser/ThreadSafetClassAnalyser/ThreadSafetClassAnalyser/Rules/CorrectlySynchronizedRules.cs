@@ -4,8 +4,10 @@ namespace ThreadSafetClassAnalyser.Rules
 {
     public static class CorrectlySynchronizedRules
     {
+        public const string FieldUsedDiagnosticId = "FieldUsedDiagnostic";
+        
         // --- PublicFieldExposed Rule ---
-        private const string ConflictingAccessThreadId = "ConflictingAccessThread";
+        public const string ConflictingAccessThreadId = "ConflictingAccessThread";
         public static readonly DiagnosticDescriptor ConflictingAccessThreadRule =
             Create(
                 ConflictingAccessThreadId,

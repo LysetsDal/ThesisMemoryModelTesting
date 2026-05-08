@@ -5,7 +5,7 @@ namespace ThreadSafetClassAnalyser.Rules
     public static class EncapsulationRules
     {
         // --- FieldAccessedExternally Rule ---
-        private const string FieldAccessedExternallyDiagnosticId = "FieldAccessedExternally";
+        public const string FieldAccessedExternallyDiagnosticId = "FieldAccessedExternally";
         public static readonly DiagnosticDescriptor FieldAccessedExternallyRule =
             Create(
                 FieldAccessedExternallyDiagnosticId,
@@ -14,7 +14,7 @@ namespace ThreadSafetClassAnalyser.Rules
             );
         
         // --- PublicFieldExposed Rule ---
-        private const string PublicFieldExposedDiagnosticId = "PublicFieldExposed";
+        public const string PublicFieldExposedDiagnosticId = "PublicFieldExposed";
         public static readonly DiagnosticDescriptor PublicFieldExposedRule =
             Create(
                 PublicFieldExposedDiagnosticId,
@@ -23,7 +23,7 @@ namespace ThreadSafetClassAnalyser.Rules
             );
         
         // --- FieldDoesNotUseLock Rule ---
-        private const string FieldDoesNotUseLockId = "FieldDoesNotUseLock";
+        public const string FieldDoesNotUseLockId = "FieldDoesNotUseLock";
         public static readonly DiagnosticDescriptor FieldDoesNotUseLockRule =
             Create(
                 FieldDoesNotUseLockId,
@@ -32,7 +32,7 @@ namespace ThreadSafetClassAnalyser.Rules
             );
         
         // --- InternalFieldNoLock ---
-        private const string InternalFieldNoLockId = "InternalFieldNoLock";
+        public const string InternalFieldNoLockId = "InternalFieldNoLock";
         public static readonly DiagnosticDescriptor InternalFieldNoLockRule =
             Create(
                 InternalFieldNoLockId,
@@ -41,7 +41,7 @@ namespace ThreadSafetClassAnalyser.Rules
             );
         
         // --- Lock Object Exposed via Public Accessor ---
-        private const string LockObjectExposedId = "LockObjectExposed";
+        public const string LockObjectExposedId = "LockObjectExposed";
         public static readonly DiagnosticDescriptor LockObjectExposedRule =
             Create(
                 LockObjectExposedId,
@@ -50,7 +50,7 @@ namespace ThreadSafetClassAnalyser.Rules
             );
         
         // --- Test Rule ---
-        private const string TestRuleId = "TestRule";
+        public const string TestRuleId = "TestRule";
         public static readonly DiagnosticDescriptor TestRuleRule =
             Create(
                 TestRuleId,
