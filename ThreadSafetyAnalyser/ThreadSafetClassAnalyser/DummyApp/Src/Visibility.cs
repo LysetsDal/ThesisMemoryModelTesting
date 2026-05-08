@@ -27,9 +27,18 @@ public class Visibility
     public bool PublicPropBreakingEncapsulation { get; set; }
     private bool PrivatePropBreakingEncapsulation { get; set; }
     
-    // -----------------------------
-    // ---------- METHODS ----------
-    // -----------------------------
+    // Needed so _anotherLock is seen as a lock target
+    public void UseAnotherLock()
+    {
+        lock (_anotherLock)
+        {
+            _count++;
+        }
+    }
+    
+    
+    // --------- WARNINGS ----------
+    
     // Should not Flag warnings 
     public int PublicPropWithSynchronization
     {
@@ -90,7 +99,6 @@ public class Visibility
     // Should Flag warnings (returns sync obj)
     public object GetSyncObject()
     {
-        //TODO: What should we do when two rules are violated on the same location?
         return _anotherLock;
     }
     

@@ -10,7 +10,7 @@ using ThreadSafetClassAnalyser.Model;
 
 namespace ThreadSafetClassAnalyser.Utils
 {
-    public static class Utils
+    public static class AnalyzerUtils
     {
         /// <summary>
         /// Helper method that determines if a field, prop or other member belongs to a class.
@@ -302,7 +302,7 @@ namespace ThreadSafetClassAnalyser.Utils
             }
         }
 
-        private static bool IsWriteAccess(IdentifierNameSyntax identifier)
+        public static bool IsWriteAccess(IdentifierNameSyntax identifier)
         {
             var parent = identifier.Parent;
     

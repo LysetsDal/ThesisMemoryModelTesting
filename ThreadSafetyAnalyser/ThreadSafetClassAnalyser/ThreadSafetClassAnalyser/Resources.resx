@@ -202,13 +202,13 @@
     <value>Field '{0}' is public. {1}</value>
   </data>
   <data name="ConflictingAccessThreadTitle" xml:space="preserve">
-    <value>(WIP) Conflicting access in Thread</value>
+    <value>Conflicting access between threads</value>
   </data>
   <data name="ConflictingAccessThreadMessageFormat" xml:space="preserve">
-    <value>(WIP) There is a conflicting access on field '{0}' in Thread '{1}' with Thread '{2}' </value>
+    <value>There is a conflicting access on field '{0}' between Thread '{1}' and Thread '{2}' </value>
   </data>
   <data name="ConflictingAccessThreadDescription" xml:space="preserve">
-    <value>(WIP) Conflicting accesses in threads</value>
+    <value>Conflicting accesses in threads where atleast one access is a write</value>
   </data>
   <data name="SP001Title" xml:space="preserve">
     <value>Field is not safely published</value>

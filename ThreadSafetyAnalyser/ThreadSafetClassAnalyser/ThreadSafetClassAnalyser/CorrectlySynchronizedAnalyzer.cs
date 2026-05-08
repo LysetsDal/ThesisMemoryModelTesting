@@ -108,16 +108,16 @@ namespace ThreadSafetClassAnalyser
                 return;
 
             // Guard for the [ThreadSafe] annotation
-            if (!Utils.Utils.IsTargetInThreadSafeClass(classSymbol)) return;
+            if (!AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) return;
             
             // Find all thread instantiations in a class
-            var threadCreations = Utils.Utils.GetObjectCreationsInClass(context, semanticModel, knownType);
+            var threadCreations = AnalyzerUtils.GetObjectCreationsInClass(context, semanticModel, knownType);
             if (threadCreations is null) return;
             
             if (threadCreations.Count < 2) return;
             
             var classLocks =
-                Utils.Utils.GetClassLockAssociationDict(classSymbol, semanticModel);
+                AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
             
             // Map each thread to the fields it accesses
             var analyzedThreads = threadCreations.Select(tc => 
@@ -129,10 +129,10 @@ namespace ThreadSafetClassAnalyser
                 {
                     Syntax = tc,
                     BodySymbol = bodySymbol,
-                    Name = Utils.Utils.GetThreadName(tc),
-                    AccessMap = Utils.Utils.GetAccessedFields(tc, semanticModel),
+                    Name = AnalyzerUtils.GetThreadName(tc),
+                    AccessMap = AnalyzerUtils.GetAccessedFields(tc, semanticModel),
                     MethodScope = tc.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault(),
-                    UsedLockObjects = Utils.Utils.GetLockObjectsUsedInMember(classLocks, bodySymbol)
+                    UsedLockObjects = AnalyzerUtils.GetLockObjectsUsedInMember(classLocks, bodySymbol)
                 };
             }).Where(t => t.BodySymbol != null).ToList();
             
@@ -153,7 +153,7 @@ namespace ThreadSafetClassAnalyser
                         continue;
 
                     // Find conflicts using the AccessMaps
-                    var conflicts = Utils.Utils.FindConflicts(t1.AccessMap, t2.AccessMap);
+                    var conflicts = AnalyzerUtils.FindConflicts(t1.AccessMap, t2.AccessMap);
 
                     foreach (var conflict in conflicts)
                     {
@@ -161,7 +161,7 @@ namespace ThreadSafetClassAnalyser
                         var info1 = t1.AccessMap[conflict];
                         var info2 = t2.AccessMap[conflict];
 
-                        if (Utils.Utils.IsCorrectlySynchronized(info1, info2)) continue;
+                        if (AnalyzerUtils.IsCorrectlySynchronized(info1, info2)) continue;
 
                         // Report
                         ReportThreadConflict(context, t1, t2, conflict.Name);
