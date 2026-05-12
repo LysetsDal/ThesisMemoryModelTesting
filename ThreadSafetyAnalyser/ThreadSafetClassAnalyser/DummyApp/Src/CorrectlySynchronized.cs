@@ -4,7 +4,7 @@ using Annotations;
 
 namespace DummyApp.Src;
 
-// [ThreadSafe]
+[ThreadSafe]
 public class CorrectlySynchronized
 {
     private int Count { get; set; } = 0;
@@ -22,6 +22,16 @@ public class CorrectlySynchronized
     public void SetOtherWork(int otherWork)
     {
         _otherWork = otherWork;
+    }
+
+
+    public void BadLockingOnClassInstance()
+    {
+        lock (this)
+        {
+            var tmp = GetOtherWork();
+            SetOtherWork(tmp + 1);
+        }
     }
     
 

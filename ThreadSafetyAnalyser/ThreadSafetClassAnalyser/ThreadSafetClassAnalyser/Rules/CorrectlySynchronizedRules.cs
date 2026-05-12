@@ -15,6 +15,14 @@ namespace ThreadSafetClassAnalyser.Rules
                 DiagnosticSeverity.Warning
             );
         
+        // --- LockOnClassInstance ---
+        public const string LockOnClassInstanceId = "LockOnClassInstance";
+        public static readonly DiagnosticDescriptor LockOnClassInstanceRule =
+            Create(
+                LockOnClassInstanceId,
+                Category.CorrectlySynchronized,
+                DiagnosticSeverity.Warning
+            );
         
         // --- VolatileReordering Rule ---
         public const string VolatileReorderingId = "VolatileReordering";

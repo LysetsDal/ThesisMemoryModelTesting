@@ -17,7 +17,8 @@ namespace ThreadSafetClassAnalyser
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(
                     CorrectlySynchronizedRules.ConflictingAccessThreadRule,
-                    CorrectlySynchronizedRules.VolatileReorderingRule
+                    CorrectlySynchronizedRules.VolatileReorderingRule,
+                    CorrectlySynchronizedRules.LockOnClassInstanceRule
                 );
         
         public override void Initialize(AnalysisContext context)
@@ -37,9 +38,77 @@ namespace ThreadSafetClassAnalyser
             // [Internal] (VolatileReorderingRule)
             // Flags method bodies with possible volatile reorderings (Independent Store/Load reordering Example)
             context.RegisterSyntaxNodeAction(AnalyzeVolatileReordering, SyntaxKind.ClassDeclaration);
+
+            // [Internal] (LockOnClassInstanceRule)
+            // Flags methods in classes that use 'this' (class instance) as a lock target
+            context.RegisterSyntaxNodeAction(AnalyzeLockThis, SyntaxKind.ClassDeclaration);
             
         }
         
+        // =============================================================
+        // ============== LOCKING ON THE 'THIS' INSTANCE ===============
+        // =============================================================
+        private static void AnalyzeLockThis(SyntaxNodeAnalysisContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+
+            // 1. Guard: Only run if the class is annotated with [ThreadSafe]
+            if (classSymbol == null || !AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) 
+                return;
+
+            // 2. Use utility to find all locks and their associations
+            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+
+            foreach (var associations in lockMap.Values)
+            {
+                foreach (var association in associations)
+                {
+                    var lockStmt = association.Lock;
+                    var isLockThis = false;
+
+                    // Direct check for 'lock(this)'
+                    if (lockStmt.Expression is ThisExpressionSyntax)
+                    {
+                        isLockThis = true;
+                    }
+                    // Semantic check to see if the expression resolves to the class instance
+                    else
+                    {
+                        var lockSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                        if (SymbolEqualityComparer.Default.Equals(lockSymbol, classSymbol))
+                        {
+                            isLockThis = true;
+                        }
+                    }
+
+                    if (!isLockThis) continue;
+                    
+                    // 3. Extract the name of the method/member containing the lock
+                    // We use your existing GetBodyName helper for consistent naming
+                    var enclosingMemberNode = lockStmt.Ancestors()
+                        .FirstOrDefault(a => a is MemberDeclarationSyntax || a is AccessorDeclarationSyntax);
+                        
+                    var displayMethodName = enclosingMemberNode != null 
+                        ? AnalyzerUtils.GetBodyName(enclosingMemberNode) 
+                        : (association.MemberContainingLock?.Name ?? "unknown");
+                        
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        CorrectlySynchronizedRules.LockOnClassInstanceRule,
+                        lockStmt.Expression.GetLocation(),
+                        classSymbol.Name,  // {0}
+                        displayMethodName                   // {1}
+                    ));
+                }
+            }
+        }
+        
+        
+        
+        // =============================================================
+        // ========= POSSIBLE VOLATILE STORE LOAD REORDERING ===========
+        // =============================================================
         private static void AnalyzeVolatileReordering(SyntaxNodeAnalysisContext context)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node;
@@ -95,9 +164,6 @@ namespace ThreadSafetClassAnalyser
                 }
             }
         }
-        
-        
-        
         
         
         // =============================================================

@@ -278,5 +278,23 @@ namespace ThreadSafetClassAnalyser {
                 return ResourceManager.GetString("InconsistentLockUseMessageFormat", resourceCulture);
             }
         }
+        
+        internal static string LockOnClassInstanceTitle {
+            get {
+                return ResourceManager.GetString("LockOnClassInstanceTitle", resourceCulture);
+            }
+        }
+        
+        internal static string LockOnClassInstanceDescription {
+            get {
+                return ResourceManager.GetString("LockOnClassInstanceDescription", resourceCulture);
+            }
+        }
+        
+        internal static string LockOnClassInstanceMessageFormat {
+            get {
+                return ResourceManager.GetString("LockOnClassInstanceMessageFormat", resourceCulture);
+            }
+        }
     }
 }
