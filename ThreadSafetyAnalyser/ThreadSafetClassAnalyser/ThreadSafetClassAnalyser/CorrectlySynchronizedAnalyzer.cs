@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 using ThreadSafetClassAnalyser.Model;
 using ThreadSafetClassAnalyser.Rules;
@@ -17,7 +16,8 @@ namespace ThreadSafetClassAnalyser
         // --- Register all supported diagnostics ---
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(
-                    CorrectlySynchronizedRules.ConflictingAccessThreadRule
+                    CorrectlySynchronizedRules.ConflictingAccessThreadRule,
+                    CorrectlySynchronizedRules.VolatileReorderingRule
                 );
         
         public override void Initialize(AnalysisContext context)
@@ -34,7 +34,71 @@ namespace ThreadSafetClassAnalyser
             // Flags Conflicting accesses on class fields and properties in Task bodies
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInTasks, SyntaxKind.ClassDeclaration);
             
+            // [Internal] (VolatileReorderingRule)
+            // Flags method bodies with possible volatile reorderings (Independent Store/Load reordering Example)
+            context.RegisterSyntaxNodeAction(AnalyzeVolatileReordering, SyntaxKind.ClassDeclaration);
+            
         }
+        
+        private static void AnalyzeVolatileReordering(SyntaxNodeAnalysisContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+
+            // Guard: Only run if the class is annotated with [ThreadSafe]
+            if (classSymbol == null || !AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) 
+                return;
+
+            // To detect reordering, we scan every method and lambda body in the class
+            var bodies = classDecl.DescendantNodes()
+                .Where(n => n is MethodDeclarationSyntax || n is AnonymousFunctionExpressionSyntax);
+
+            foreach (var body in bodies)
+            {
+                var methodName = AnalyzerUtils.GetBodyName(body);
+
+                // 1. Establish Program Order (PO) within this specific method/lambda body 
+                var identifiers = body.DescendantNodes().OfType<IdentifierNameSyntax>().ToList();
+
+                for (var i = 0; i < identifiers.Count; i++)
+                {
+                    var idWrite = identifiers[i];
+                    var writeSymbol = semanticModel.GetSymbolInfo(idWrite).Symbol as IFieldSymbol;
+
+                    // Step: Filter for Volatile Write
+                    if (writeSymbol == null || !writeSymbol.IsVolatile || !AnalyzerUtils.IsWriteAccess(idWrite))
+                        continue;
+
+                    for (var j = i + 1; j < identifiers.Count; j++)
+                    {
+                        var idRead = identifiers[j];
+                        var readSymbol = semanticModel.GetSymbolInfo(idRead).Symbol as IFieldSymbol;
+
+                        // Step: Identify Volatile Read occurring later in PO 
+                        if (readSymbol == null || !readSymbol.IsVolatile || AnalyzerUtils.IsWriteAccess(idRead))
+                            continue;
+
+                        // 2. Check for Full Fences (Intervening synchronization) 
+                        // We pass 'body' as the root to check for barriers between the write and read
+                        if (!AnalyzerUtils.HasFullFenceBetween(body, idWrite, idRead, semanticModel))
+                        {
+                            // 3. Flag Total Order Violation
+                            context.ReportDiagnostic(Diagnostic.Create(
+                                CorrectlySynchronizedRules.VolatileReorderingRule,
+                                idRead.GetLocation(),
+                                readSymbol.Name,
+                                methodName,
+                                writeSymbol.Name));
+                        }
+                    }
+                }
+            }
+        }
+        
+        
+        
+        
         
         // =============================================================
         // ========= CONFLICTING ACCESSES IN TASKS AND THREADS =========

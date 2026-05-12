@@ -15,6 +15,16 @@ namespace ThreadSafetClassAnalyser.Rules
                 DiagnosticSeverity.Warning
             );
         
+        
+        // --- VolatileReordering Rule ---
+        public const string VolatileReorderingId = "VolatileReordering";
+        public static readonly DiagnosticDescriptor VolatileReorderingRule =
+            Create(
+                VolatileReorderingId,
+                Category.CorrectlySynchronized,
+                DiagnosticSeverity.Warning
+            );
+        
         private static DiagnosticDescriptor Create(string id, string category, DiagnosticSeverity severity)
         {
             var meta = new AnalyserMetadata(id);

@@ -1,10 +1,11 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Collections.Generic;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
+using ThreadSafetClassAnalyser.Model;
 using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
 
@@ -20,10 +21,10 @@ namespace ThreadSafetClassAnalyser
                 EncapsulationRules.FieldDoesNotUseLockRule,
                 EncapsulationRules.InternalFieldNoLockRule,
                 EncapsulationRules.LockObjectExposedRule,
+                EncapsulationRules.InconsistentLockUseRule,
                 EncapsulationRules.TestRuleRule
             );
         
-
         
         // Internal = The diagnostic message is internally visible inside the class with the field or method.
         // External = The diagnostic rule is externally visible (at the call-site class) but not inside the class with the field or method.
@@ -51,11 +52,12 @@ namespace ThreadSafetClassAnalyser
             // [Internal] (InternalFieldNoLockRule)
             // This rule flags fields internally, if they have public accessors without synchronization.
             context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.FieldDeclaration);
+            context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.PropertyDeclaration);
             
             // [Internal] (LockObjectExposedRule)
             // Finds all locks in a namedType (a class) that are exposed through public accessor.
             context.RegisterSymbolAction(AnalyzeExposedClassLocks, SymbolKind.NamedType);
-            
+
         }
         
         // -------------------------------------------------------------------------
@@ -165,7 +167,7 @@ namespace ThreadSafetClassAnalyser
                 EncapsulationRules.FieldAccessedExternallyRule,
                 memberAccess.Name.GetLocation(),
                 $"{symbol.Name} is in source: {symbol.Locations[0].IsInSource} is in metadata {symbol.Locations[0].IsInMetadata}",
-                containingType.Name);
+                containingType?.Name);
             
             context.ReportDiagnostic(diagnostic);
 
@@ -230,8 +232,6 @@ namespace ThreadSafetClassAnalyser
             context.ReportDiagnostic(diagnostic);
         }
         
-        
-        
         /// <summary>
         /// Analyses if a field in a source class can be accessed through any field usages without a lock.
         /// Warning is displayed internally in the class.
@@ -239,81 +239,169 @@ namespace ThreadSafetClassAnalyser
         /// <param name="context"> A FieldDeclarationSyntax node from the root analysis context </param> 
         private static void AnalyzeInternalFieldAccessWithLock(SyntaxNodeAnalysisContext context)
         {
-            // Guard Clause: Only run if annotated with: [ThreadSafe]
             if (!AnalyzerUtils.IsInThreadSafeClass(context)) return;
-            
-            // 1. Find the Field
-            var fieldDecl = (FieldDeclarationSyntax)context.Node;
-            var className = context.ContainingSymbol?.ContainingType.ContainingSymbol;
-            
-            // Rule does not apply to Interfaces, Records or Structs
             if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
 
-            // Get First variable (i.e. 'public int a, b, c' is not allowed)
-            var variableDeclaration = AnalyzerUtils.GetFirstVariableInFieldDeclaration(fieldDecl);
-                
-            var fieldSymbol = context.SemanticModel.GetDeclaredSymbol(variableDeclaration, context.CancellationToken) as IFieldSymbol;
-            if (fieldSymbol == null) return;
-            
-            // Const and readonly fields are thread-safe for reading
-            if (fieldSymbol.IsConst || fieldSymbol.IsReadOnly) return;
-            
-            // Get the class containing the field
-            // var root = context.SemanticModel.SyntaxTree.GetRoot();
-            var classDecl = fieldDecl.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+            var className = context.ContainingSymbol?.ContainingType;
+            var classDecl = context.Node.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
             if (classDecl == null) return;
 
-            // Look for all identifier names in this class
-            var fieldUsages = classDecl.DescendantNodes()
-                .OfType<IdentifierNameSyntax>()
-                .Where(id => {
-                    var symbol = context.SemanticModel.GetSymbolInfo(id).Symbol;
-                    return SymbolEqualityComparer.Default.Equals(symbol, fieldSymbol);
-                });
-            
-            foreach (var usage in fieldUsages)
+            // 1. Identify all symbols declared by this node (Handles multiple fields or single property)
+            var symbolsToAnalyze = new List<ISymbol>();
+
+            if (context.Node is FieldDeclarationSyntax fieldDecl)
             {
-                // Is there a surrounding lock
-                var enclosingLock = usage.Ancestors()
-                    .OfType<LockStatementSyntax>()
-                    .FirstOrDefault();
-                
-                var incriminatingMethod = usage.Ancestors()
-                    .OfType<MethodDeclarationSyntax>()
-                    .FirstOrDefault();
-                
-                if (incriminatingMethod == null) continue;
-                
-                var methodSymbol = context.SemanticModel.GetDeclaredSymbol(incriminatingMethod);
-                if (methodSymbol?.DeclaredAccessibility != Accessibility.Public) continue;
+                foreach (var variable in fieldDecl.Declaration.Variables)
+                {
+                    var symbol = context.SemanticModel.GetDeclaredSymbol(variable) as IFieldSymbol;
+                    if (symbol != null && !symbol.IsConst) 
+                        symbolsToAnalyze.Add(symbol);
+                }
+            }
+            else if (context.Node is PropertyDeclarationSyntax propDecl)
+            {
+                var symbol = context.SemanticModel.GetDeclaredSymbol(propDecl);
+                // Properties are generally not 'const', but we check IsReadOnly (no setter)
+                if (symbol != null) 
+                    symbolsToAnalyze.Add(symbol);
+            }
 
-                if (enclosingLock != null) continue;
-                
-                // Is it a constructor
-                var isInsideConstructor = usage.Ancestors()
-                    .OfType<ConstructorDeclarationSyntax>().Any();
-                
-                if (isInsideConstructor) continue;
-                
-                // Is the field being returned or written to directly
-                var isReturned = usage.Ancestors().OfType<ReturnStatementSyntax>().Any();
-                var isWrittenTo = AnalyzerUtils.IsWriteAccess(usage);
-                
-                if (!isReturned && !isWrittenTo) continue;
-                    
-                // REPORT: Field access is not protected!
-                var diagnostic = Diagnostic.Create(
-                    EncapsulationRules.InternalFieldNoLockRule,
-                    usage.GetLocation(),
-                    fieldSymbol.Name, // Internal field name
-                    className,                         // Declaring class name
-                    incriminatingMethod.Identifier     // Method name
-                );
+            if (symbolsToAnalyze.Count == 0) return;
 
-                context.ReportDiagnostic(diagnostic);
+            // 2. Run analysis for each identified symbol
+            foreach (var memberSymbol in symbolsToAnalyze)
+            {
+                // Collect all usages of this specific field/property in the class
+                var accessInfos = classDecl.DescendantNodes()
+                    .OfType<IdentifierNameSyntax>()
+                    .Where(id => SymbolEqualityComparer.Default.Equals(context.SemanticModel.GetSymbolInfo(id).Symbol, memberSymbol))
+                    .Select(usage => new 
+                    {
+                        Usage = usage,
+                        LockSymbol = AnalyzerUtils.GetEnclosingLockSymbol(usage, context.SemanticModel),
+                        Method = usage.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault(),
+                        IsWrite = AnalyzerUtils.IsWriteAccess(usage),
+                        IsInsideConstructor = usage.Ancestors().OfType<ConstructorDeclarationSyntax>().Any()
+                    })
+                    .Where(info => !info.IsInsideConstructor && info.Method != null)
+                    .ToList();
+
+                // Determine the 'Primary Lock' for this specific member
+                var primaryLock = accessInfos
+                    .Where(a => a.LockSymbol != null)
+                    .GroupBy(a => a.LockSymbol, SymbolEqualityComparer.Default)
+                    .OrderByDescending(g => g.Count())
+                    .Select(g => g.Key)
+                    .FirstOrDefault();
+
+                foreach (var info in accessInfos)
+                {
+                    var methodSymbol = context.SemanticModel.GetDeclaredSymbol(info.Method);
+                    if (methodSymbol?.DeclaredAccessibility != Accessibility.Public) continue;
+
+                    // SCENARIO A: No lock used
+                    if (info.LockSymbol == null)
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            EncapsulationRules.InternalFieldNoLockRule,
+                            info.Usage.GetLocation(),
+                            memberSymbol.Name,
+                            className?.Name ?? "Unknown",
+                            info.Method.Identifier.Text));
+                        continue;
+                    }
+
+                    // SCENARIO B: Inconsistent Lock
+                    if (primaryLock != null && !SymbolEqualityComparer.Default.Equals(info.LockSymbol, primaryLock))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            EncapsulationRules.InconsistentLockUseRule,
+                            info.Usage.GetLocation(),
+                            memberSymbol.Name,
+                            info.LockSymbol.Name,
+                            primaryLock.Name));
+                    }
+                }
             }
         }
 
+        private static void AnalyzeInternalFieldAccessWithLock2(SyntaxNodeAnalysisContext context)
+        {
+            if (!AnalyzerUtils.IsInThreadSafeClass(context)) return;
+            
+            var fieldDecl = (FieldDeclarationSyntax)context.Node;
+            var className = context.ContainingSymbol?.ContainingType;
+            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
+
+            var variableDeclaration = AnalyzerUtils.GetFirstVariableInFieldDeclaration(fieldDecl);
+            var fieldSymbol = context.SemanticModel.GetDeclaredSymbol(variableDeclaration) as IFieldSymbol;
+            
+            if (fieldSymbol == null || fieldSymbol.IsConst || fieldSymbol.IsReadOnly) return;
+            
+            var classDecl = fieldDecl.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+            if (classDecl == null) return;
+
+            // 1. Collect metadata for every usage of this field in the class
+            var accessInfos = classDecl.DescendantNodes()
+                .OfType<IdentifierNameSyntax>()
+                .Where(id => SymbolEqualityComparer.Default
+                    .Equals(context.SemanticModel.GetSymbolInfo(id).Symbol, fieldSymbol))
+                .Select(usage => new 
+                {
+                    Usage = usage,
+                    LockSymbol = AnalyzerUtils.GetEnclosingLockSymbol(usage, context.SemanticModel),
+                    Method = usage.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault(),
+                    IsWrite = AnalyzerUtils.IsWriteAccess(usage),
+                    IsInsideConstructor = usage.Ancestors().OfType<ConstructorDeclarationSyntax>().Any()
+                })
+                .Where(info => !info.IsInsideConstructor && info.Method != null)
+                .ToList();
+
+            // 2. Identify the 'Primary Lock' used for this field (the most common one)
+            var primaryLock = accessInfos
+                .Where(a => a.LockSymbol != null)
+                .GroupBy(a => a.LockSymbol, SymbolEqualityComparer.Default)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .FirstOrDefault();
+
+            // 3. Evaluate each access against the locking policy
+            foreach (var info in accessInfos)
+            {
+                // Skip private methods if your policy only targets public entry points
+                if (context.SemanticModel.GetDeclaredSymbol(info.Method)?.DeclaredAccessibility != Accessibility.Public) 
+                    continue;
+
+                // SCENARIO A: No lock used at all
+                if (info.LockSymbol == null)
+                {
+                    var diagnostic = Diagnostic.Create(
+                        EncapsulationRules.InternalFieldNoLockRule,
+                        info.Usage.GetLocation(),
+                        fieldSymbol.Name,
+                        className?.Name ?? "Unknown",
+                        info.Method.Identifier.Text);
+            
+                    context.ReportDiagnostic(diagnostic);
+                    continue;
+                }
+
+                // SCENARIO B: Inconsistent Lock (Functionality from your other method)
+                // If this place uses lock(B) but most other places use lock(A)
+                if (primaryLock != null && !SymbolEqualityComparer.Default.Equals(info.LockSymbol, primaryLock))
+                {
+                    var diagnostic = Diagnostic.Create(
+                        EncapsulationRules.InconsistentLockUseRule,
+                        info.Usage.GetLocation(),
+                        fieldSymbol.Name,
+                        info.LockSymbol.Name,
+                        primaryLock.Name);
+
+                    context.ReportDiagnostic(diagnostic);
+                }
+            }
+        }
+        
         // -------------------------------------------------------------------------
         // PublicFieldExposed — detects raw public fields (not properties)
         // -------------------------------------------------------------------------

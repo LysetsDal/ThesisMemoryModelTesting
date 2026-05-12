@@ -1,4 +1,6 @@
-﻿namespace DummyApp.Model
+﻿using System;
+
+namespace DummyApp.Src
 {
     class A
     {

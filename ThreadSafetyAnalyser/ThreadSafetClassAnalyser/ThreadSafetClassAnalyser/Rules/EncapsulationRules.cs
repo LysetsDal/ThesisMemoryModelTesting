@@ -49,6 +49,15 @@ namespace ThreadSafetClassAnalyser.Rules
                 DiagnosticSeverity.Warning
             );
         
+        // --- Inconsistent Lock Use ---
+        public const string InconsistentLockUseId = "InconsistentLockUse";
+        public static readonly DiagnosticDescriptor InconsistentLockUseRule =
+            Create(
+                InconsistentLockUseId,
+                Category.Encapsulation,
+                DiagnosticSeverity.Warning
+            );
+        
         // --- Test Rule ---
         public const string TestRuleId = "TestRule";
         public static readonly DiagnosticDescriptor TestRuleRule =

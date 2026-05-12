@@ -1,3 +1,4 @@
+using System;
 using DummyApp.Src;
 
 namespace DummyApp;
@@ -28,5 +29,6 @@ internal static class Program
         
         cs.TwoLockedThreads_SameLockSymbols();
         cs.TwoLockedThreads_DifferentLockSymbols();
+        
     }
 }

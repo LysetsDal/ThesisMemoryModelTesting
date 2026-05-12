@@ -165,13 +165,13 @@
   </data>
   
   <data name="TestRuleTitle" xml:space="preserve">
-    <value>TEST</value>
+    <value>Test Rule</value>
   </data>
   <data name="TestRuleDescription" xml:space="preserve">
-    <value>TEST</value>
+    <value>An anonymous test rule</value>
   </data>
   <data name="TestRuleMessageFormat" xml:space="preserve">
-    <value>TEST: '{0}' ; '{1}'</value>
+    <value>Test rule: '{0}' and '{1}' and '{2}'</value>
   </data>
   
   <data name="InternalFieldNoLockTitle" xml:space="preserve">
@@ -227,5 +227,23 @@
   </data>
   <data name="SP003Description" xml:space="preserve">
     <value>Calling a virtual method in a constructor is unsafe when a derived class overrides it and reads fields that are set in the derived constructor body, not in initializers.</value>
+  </data>
+  <data name="VolatileReorderingTitle" xml:space="preserve">
+    <value>Possible volatile store/load reordering.</value>
+  </data>
+  <data name="VolatileReorderingMessageFormat" xml:space="preserve">
+    <value>The volatile read '{0}' in method '{1}' is at risk of being reordered to happen before the volatile write '{2}' in the same method.</value>
+  </data>
+  <data name="VolatileReorderingDescription" xml:space="preserve">
+    <value>In C# a volatile write followed by a volatile read may be reordered without a full-fence memory barrier.</value>
+  </data>
+  <data name="InconsistentLockUseTitle" xml:space="preserve">
+    <value>Inconsistent Lock usage on field or property</value>
+  </data>
+  <data name="InconsistentLockUseDescription" xml:space="preserve">
+    <value>Access to this field or property is not always synchronized by the same lock</value>
+  </data>
+  <data name="InconsistentLockUseMessageFormat" xml:space="preserve">
+    <value>The field '{0}' uses lock '{1}' but other places it uses lock '{2}'</value>
   </data>
 </root>

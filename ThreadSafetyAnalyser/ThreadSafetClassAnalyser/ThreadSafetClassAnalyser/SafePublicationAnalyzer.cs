@@ -55,8 +55,8 @@ namespace ThreadSafetClassAnalyser
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
-            context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
-            context.RegisterSyntaxNodeAction(AnalyzeConstructorForVirtualCalls, SyntaxKind.ConstructorDeclaration);
+            // context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
+            // context.RegisterSyntaxNodeAction(AnalyzeConstructorForVirtualCalls, SyntaxKind.ConstructorDeclaration);
         }
 
         private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
@@ -71,7 +71,7 @@ namespace ThreadSafetClassAnalyser
             // --- SP001: Check all instance fields for safe publication ---
             foreach (var fieldDecl in classDecl.Members.OfType<FieldDeclarationSyntax>())
             {
-                // Skip static, const, readonly, and volatile fields — they are safely published
+                // Skip static, const, readonly, and volatile fields ï¿½ they are safely published
                 if (fieldDecl.Modifiers.Any(m =>
                         m.IsKind(SyntaxKind.StaticKeyword) ||
                         m.IsKind(SyntaxKind.ConstKeyword) ||
@@ -85,7 +85,7 @@ namespace ThreadSafetClassAnalyser
                     if (fieldSymbol == null || fieldSymbol.IsConst)
                         continue;
 
-                    // Skip fields whose type is immutable — their state cannot change after construction
+                    // Skip fields whose type is immutable ï¿½ their state cannot change after construction
                     if (IsImmutableType(fieldSymbol.Type))
                         continue;
 
@@ -157,7 +157,7 @@ namespace ThreadSafetClassAnalyser
             if (type.TypeKind == TypeKind.Enum)
                 return true;
 
-            // Interfaces are never considered immutable — they are contracts only.
+            // Interfaces are never considered immutable ï¿½ they are contracts only.
             // Even IReadOnlyList<T> does not guarantee the backing object is immutable.
             if (type.TypeKind == TypeKind.Interface)
                 return false;
@@ -174,7 +174,7 @@ namespace ThreadSafetClassAnalyser
             if (namedType.IsRecord)
                 return true;
 
-            // Per the Microsoft definition — a type is immutable if it has:
+            // Per the Microsoft definition ï¿½ a type is immutable if it has:
             //   - No public properties or fields, OR
             //   - Only read-only properties (no setter), OR
             //   - Only init-only setters on properties
