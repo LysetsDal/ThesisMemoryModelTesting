@@ -1,9 +1,10 @@
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using ThreadSafetClassAnalyser.Model;
 
@@ -120,8 +121,32 @@ namespace ThreadSafetClassAnalyser.Utils
 
                 foreach (var lockStmt in allLocks)
                 {
-                    // This is safe because we verified the tree matches
-                    var lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                    // Determine WHAT is being locked (the expression inside the parentheses)
+                    ISymbol lockObjSymbol;
+                    try
+                    {
+                        lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        var lockExprText = lockStmt.Expression.ToString();
+                        var lockLocation = lockStmt.GetLocation();
+                        var syntaxTreePath = lockStmt.SyntaxTree.FilePath;
+                        var modelTreePath = semanticModel.SyntaxTree.FilePath;
+                        var treeMatch = lockStmt.SyntaxTree == semanticModel.SyntaxTree;
+
+                        throw new InvalidOperationException(
+                            $@"
+                            [GetClassLockAssociationDict] SemanticModel/SyntaxTree mismatch while resolving lock expression.
+            
+                              Class       : {classSymbol.ToDisplayString()}
+                              Lock expr   : {lockExprText}
+                              Lock at     : {lockLocation.GetLineSpan()}
+                              Node tree   : {syntaxTreePath}
+                              Model tree  : {modelTreePath}
+                              Trees match : {treeMatch}
+                            ", ex);
+                    }
                     if (lockObjSymbol == null) continue;
 
                     var enclosingMember = lockStmt.Ancestors()
