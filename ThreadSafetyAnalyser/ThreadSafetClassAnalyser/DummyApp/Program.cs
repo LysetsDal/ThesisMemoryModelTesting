@@ -1,8 +1,10 @@
 using System;
+using Annotations;
 using DummyApp.Src;
 
 namespace DummyApp;
 
+// [ThreadSafe]
 internal static class Program
 {
     private static readonly object Lock = new();
@@ -14,6 +16,11 @@ internal static class Program
         
         // Should flag warning
         visibility.GetCount();
+
+        // Should not flag if readonly 
+        var externalAccess = visibility._transactionReadOnly;
+        
+        
         
         lock (Lock)
         {
@@ -31,4 +38,25 @@ internal static class Program
         cs.TwoLockedThreads_DifferentLockSymbols();
         
     }
+
+    public static Visibility Connect()
+    {
+        var result = new Visibility();
+
+        try
+        {
+            result.PublicPropBreakingEncapsulation = false;
+            var tmp = result.PrivateReadonlyProp;
+
+            var tmp2 = result.PublicPropWithSynchronization;
+
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e.Message);
+        }
+
+        return result;
+    }
+    
 }

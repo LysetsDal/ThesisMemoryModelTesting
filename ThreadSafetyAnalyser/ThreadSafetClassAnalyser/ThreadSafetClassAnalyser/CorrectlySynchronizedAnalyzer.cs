@@ -55,7 +55,7 @@ namespace ThreadSafetClassAnalyser
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
 
             // 1. Guard: Only run if the class is annotated with [ThreadSafe]
-            if (classSymbol == null || !AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) 
+            if (classSymbol == null || !ThreadSafeValidator.ShouldValidateTarget(classSymbol)) 
                 return;
 
             // 2. Use utility to find all locks and their associations
@@ -116,8 +116,8 @@ namespace ThreadSafetClassAnalyser
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
 
             // Guard: Only run if the class is annotated with [ThreadSafe]
-            if (classSymbol == null || !AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) 
-                return;
+            if (classSymbol == null || !ThreadSafeValidator.ShouldValidateTarget(classSymbol)) 
+                 return;
 
             // To detect reordering, we scan every method and lambda body in the class
             var bodies = classDecl.DescendantNodes()
@@ -189,7 +189,8 @@ namespace ThreadSafetClassAnalyser
             if (classSymbol == null) return;
 
             // Guard for the [ThreadSafe] annotation
-            if (!AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) return;
+            if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
+            
             
             // Find all thread instantiations in a class
             var threadCreations = AnalyzerUtils.GetObjectCreationsInClass(context, semanticModel, knownType);
