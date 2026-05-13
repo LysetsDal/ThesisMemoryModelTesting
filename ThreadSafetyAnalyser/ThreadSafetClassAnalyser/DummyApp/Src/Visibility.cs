@@ -6,7 +6,7 @@ namespace DummyApp.Src;
 #pragma warning disable CS0414 // Field is assigned but its value is never used
 [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
-[ThreadSafe]
+// [ThreadSafe]
 public class Visibility
 {
     private readonly object _lock = new();
@@ -17,14 +17,16 @@ public class Visibility
     
     private int _count = 0;
     private readonly int _countReadOnly = 1;
-
+    
     
     public bool PublicFieldBreakingEncapsulation = true;
     private bool _privateFieldBreakingEncapsulation = false;
     
     public bool PublicPropBreakingEncapsulation { get; set; }
     private bool PrivatePropBreakingEncapsulation { get; set; }
+    public bool PrivateReadonlyProp { get; } = true;
     
+    public byte Slot { get; private set; }
     
     // Needed so _anotherLock is seen as a lock target
     public void UseAnotherLock()

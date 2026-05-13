@@ -3,11 +3,10 @@ using DummyApp.Model;
 
 namespace DummyApp.Src;
 
-
 /// <summary>
 /// Excerpt from Audit.NET repo see https://github.com/thepirat000/Audit.NET#
 /// </summary>
-[ThreadSafe]
+// [ThreadSafe]
 public class ComplexClass
 {
     
