@@ -56,57 +56,53 @@ namespace ThreadSafetClassAnalyser
             
             // [Internal] (LockObjectExposedRule)
             // Finds all locks in a namedType (a class) that are exposed through public accessor.
-            context.RegisterSymbolAction(AnalyzeExposedClassLocks, SymbolKind.NamedType);
+            context.RegisterSyntaxNodeAction(AnalyzeExposedLocksInFile, SyntaxKind.ClassDeclaration);
 
         }
         
         // -------------------------------------------------------------------------
         // Internal: LockObjectExposed through public Accessor
         // -------------------------------------------------------------------------
-        private static void AnalyzeExposedClassLocks(SymbolAnalysisContext context)
+        private static void AnalyzeExposedLocksInFile(SyntaxNodeAnalysisContext context)
         {
+            // Use the validator with the SyntaxNode context
             if (!ThreadSafeValidator.ShouldValidate(context)) return;
-            
-            var classSymbol = (INamedTypeSymbol)context.Symbol;
-            if (classSymbol.TypeKind != TypeKind.Class) return;
 
-            var firstRef = classSymbol.DeclaringSyntaxReferences.FirstOrDefault();
-            if (firstRef == null) return;
-            var semanticModel = context.Compilation.GetSemanticModel(firstRef.SyntaxTree);
-            
-            // 1. Get the map of symbols actually used for locking
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel; // Safe and efficient
+    
+            // Get the symbol for the logical class
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return;
+
+            // Use your utility to find lock objects used anywhere in the class
+            // Note: GetClassLockAssociationDict should now be careful not to trigger RS1030
             var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
             var allLockSymbols = lockMap.Keys.ToImmutableHashSet(SymbolEqualityComparer.Default);
 
             if (allLockSymbols.IsEmpty) return;
 
-            // 2. Broaden the search: Check EVERY member of the class
-            foreach (var member in classSymbol.GetMembers())
+            // Only process members physically written in THIS file
+            foreach (var memberSyntax in classDecl.Members)
             {
-                // ALLOW Methods (GetSyncObject) and Properties
-                if (!(member is IMethodSymbol) && !(member is IPropertySymbol)) continue;
-    
-                // Only flag if the member is Public
-                if (member.DeclaredAccessibility != Accessibility.Public) continue;
-                
-                foreach (var syntaxRef in member.DeclaringSyntaxReferences)
-                {
-                    var memberSyntax = syntaxRef.GetSyntax();
+                if (!(memberSyntax is MethodDeclarationSyntax || memberSyntax is PropertyDeclarationSyntax)) 
+                    continue;
 
-                    // 3. Find all potential exit points (Returns and Arrows)
-                    var returns = memberSyntax.DescendantNodes().OfType<ReturnStatementSyntax>();
-                    var arrows = memberSyntax.DescendantNodes().OfType<ArrowExpressionClauseSyntax>();
-                        
-                    foreach (var ret in returns)
-                    {
-                        if (ret.Expression == null) continue;
-                        CheckAndReportLockObjectExposedRule(context, semanticModel, ret.Expression, allLockSymbols, member, classSymbol.Name);
-                    }
-                        
-                    foreach (var arrow in arrows)
-                    {
-                        CheckAndReportLockObjectExposedRule(context, semanticModel, arrow.Expression, allLockSymbols, member, classSymbol.Name);
-                    }
+                var memberSymbol = semanticModel.GetDeclaredSymbol(memberSyntax);
+                if (memberSymbol == null || memberSymbol.DeclaredAccessibility != Accessibility.Public) 
+                    continue;
+
+                // Inspect exit points (Returns/Arrows) within this file
+                var exitPoints = memberSyntax.DescendantNodes()
+                    .Where(n => n is ReturnStatementSyntax || n is ArrowExpressionClauseSyntax);
+
+                foreach (var exit in exitPoints)
+                {
+                    ExpressionSyntax expr = exit is ReturnStatementSyntax ret ? ret.Expression : ((ArrowExpressionClauseSyntax)exit).Expression;
+                    if (expr == null) continue;
+
+                    // Safe to analyze because expr and semanticModel belong to the same tree
+                    CheckAndReportLockObjectExposedRule(context, semanticModel, expr, allLockSymbols, memberSymbol, classSymbol.Name);
                 }
             }
         }
@@ -115,7 +111,7 @@ namespace ThreadSafetClassAnalyser
         /// Helper func for AnalyzeExposedClassLocks() to verify if an expression resolves to one of our forbidden lock symbols.
         /// </summary>
         private static void CheckAndReportLockObjectExposedRule(
-            SymbolAnalysisContext context, 
+            SyntaxNodeAnalysisContext context, 
             SemanticModel semanticModel, 
             ExpressionSyntax expression, 
             IImmutableSet<ISymbol> lockSymbols,
