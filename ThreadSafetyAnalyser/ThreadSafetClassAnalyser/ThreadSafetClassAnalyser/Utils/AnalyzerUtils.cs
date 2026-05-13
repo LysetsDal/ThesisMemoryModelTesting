@@ -171,7 +171,7 @@ namespace ThreadSafetClassAnalyser.Utils
         /// </summary>
         /// <param name="methodSymbol"></param>
         /// <returns></returns>
-        public static LockStatementSyntax FindFirstLockFromMethodSymbol(ISymbol methodSymbol)
+        public static LockStatementSyntax FindFirstDescendantLockFromMethodSymbol(ISymbol methodSymbol)
         {
             var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
 
@@ -196,7 +196,7 @@ namespace ThreadSafetClassAnalyser.Utils
         /// The <see cref="ISymbol"/> representing the object being locked e.g. 'object _lock = new()', 
         /// or <c>null</c> if the node is not contained within a lock statement or the symbol cannot be resolved.
         /// </returns>
-        private static ISymbol GetSurroundingLockSymbol(SyntaxNode node, SemanticModel model)
+        public static ISymbol GetFirstAncestorLockFromSymbol(SyntaxNode node, SemanticModel model)
         {
             var lockStmt = node
                 .Ancestors()
@@ -235,6 +235,14 @@ namespace ThreadSafetClassAnalyser.Utils
             }
         }
         
+        public static ISymbol GetEnclosingLockSymbol(SyntaxNode node, SemanticModel model)
+        {
+            var lockStatement = node.Ancestors().OfType<LockStatementSyntax>().FirstOrDefault();
+            if (lockStatement == null) return null;
+
+            return model.GetSymbolInfo(lockStatement.Expression).Symbol;
+        }
+        
         
         // ========================================================================================
         // =========================== CORRECTLY SYNCHRONIZED ANALYSER ============================
@@ -259,7 +267,7 @@ namespace ThreadSafetClassAnalyser.Utils
             return accessed;
         }
 
-        private static void PopulateAccessesRecursive(
+        public static void PopulateAccessesRecursive(
             SyntaxNode node,
             SemanticModel model, 
             IDictionary<ISymbol, AccessInfo> accessed, 
@@ -278,7 +286,7 @@ namespace ThreadSafetClassAnalyser.Utils
                 
                 // Determine if it's a write by checking if it's on the left side of an assignment
                 var isWrite = IsWriteAccess(id);
-                var effectiveLock = currentLockSymbol ?? GetSurroundingLockSymbol(id, model);
+                var effectiveLock = currentLockSymbol ?? GetFirstAncestorLockFromSymbol(id, model);
                     
                 UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock);
             }
@@ -291,7 +299,7 @@ namespace ThreadSafetClassAnalyser.Utils
                 if (!visitedMethods.Add(methodSymbol)) continue;
 
                 // Check if THIS specific call is wrapped in a lock before jumping
-                var lockAtCallSite = currentLockSymbol ?? GetSurroundingLockSymbol(invocation, model);
+                var lockAtCallSite = currentLockSymbol ?? GetFirstAncestorLockFromSymbol(invocation, model);
 
                 foreach (var reference in methodSymbol.DeclaringSyntaxReferences)
                 {
@@ -304,15 +312,28 @@ namespace ThreadSafetClassAnalyser.Utils
 
         public static bool IsWriteAccess(IdentifierNameSyntax identifier)
         {
-            var parent = identifier.Parent;
-    
-            // Check if it's the Left part of an assignment: otherWork = 42;
-            if (parent is AssignmentExpressionSyntax assignment && assignment.Left == identifier)
-                return true;
+            SyntaxNode current = identifier;
 
-            // Check for increment/decrement: otherWork++;
-            if (parent is PostfixUnaryExpressionSyntax || parent is PrefixUnaryExpressionSyntax)
+            // Walk up through member accesses (obj.Field) or element accesses (arr[i])
+            // to find the full expression being assigned to.
+            while (current.Parent is MemberAccessExpressionSyntax || current.Parent is ElementAccessExpressionSyntax)
+            {
+                current = current.Parent;
+            }
+
+            var parent = current.Parent;
+
+            // 1. Check for assignment: current = value;
+            if (parent is AssignmentExpressionSyntax assignment && assignment.Left == current)
+            {
                 return true;
+            }
+
+            // 2. Check for increment/decrement: current++;
+            if (parent is PostfixUnaryExpressionSyntax || parent is PrefixUnaryExpressionSyntax)
+            {
+                return true;
+            }
 
             return false;
         }
@@ -370,7 +391,51 @@ namespace ThreadSafetClassAnalyser.Utils
                 })
                 .ToList();
         }
+        
+        public static bool HasFullFenceBetween(SyntaxNode root, SyntaxNode start, SyntaxNode end, SemanticModel model)
+        {
+            var startPos = start.SpanStart;
+            var endPos = end.SpanStart;
 
+            // Identify all nodes between the Write and Read in Program Order
+            var nodesInBetween = root.DescendantNodes()
+                .Where(n => n.SpanStart > startPos && n.SpanStart < endPos);
+
+            foreach (var node in nodesInBetween)
+            {
+                // Check for Thread.MemoryBarrier() [cite: 240]
+                if (node is InvocationExpressionSyntax invocation)
+                {
+                    var symbol = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+                    if (symbol != null)
+                    {
+                        var containingType = symbol.ContainingType.ToDisplayString();
+                        // Barriers: Thread.MemoryBarrier, Interlocked operations, or entering a lock
+                        if (containingType == "System.Threading.Thread" && symbol.Name == "MemoryBarrier") return true;
+                        if (containingType == "System.Threading.Interlocked") return true;
+                    }
+                }
+
+                // Check for lock statements (Full fence on entry/exit) [cite: 159, 200]
+                if (node is LockStatementSyntax) return true;
+            }
+
+            return false;
+        }
+        
+        /// <summary>
+        /// Helper to resolve a name for the current code block context.
+        /// </summary>
+        public static string GetBodyName(SyntaxNode body)
+        {
+            if (body is MethodDeclarationSyntax method) 
+                return method.Identifier.Text;
+
+            if (!(body is AccessorDeclarationSyntax accessor)) return "anonymous method";
+            var prop = accessor.Ancestors().OfType<PropertyDeclarationSyntax>().FirstOrDefault();
+            var propName = prop?.Identifier.Text ?? "UnknownProperty";
+            return $"{(accessor.Kind() == SyntaxKind.GetAccessorDeclaration ? "get" : "set")} of {propName}";
+        }
         
         public static bool IsCorrectlySynchronized(AccessInfo info1, AccessInfo info2)
         {

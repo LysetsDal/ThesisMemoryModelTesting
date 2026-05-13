@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using Annotations;
 
 namespace DummyApp.Src;
@@ -20,6 +22,16 @@ public class CorrectlySynchronized
     public void SetOtherWork(int otherWork)
     {
         _otherWork = otherWork;
+    }
+
+
+    public void BadLockingOnClassInstance()
+    {
+        lock (this)
+        {
+            var tmp = GetOtherWork();
+            SetOtherWork(tmp + 1);
+        }
     }
     
 

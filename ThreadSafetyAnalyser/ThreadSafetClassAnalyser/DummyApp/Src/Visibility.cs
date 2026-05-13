@@ -20,12 +20,11 @@ public class Visibility
 
     
     public bool PublicFieldBreakingEncapsulation = true;
-    
     private bool _privateFieldBreakingEncapsulation = false;
-    
     
     public bool PublicPropBreakingEncapsulation { get; set; }
     private bool PrivatePropBreakingEncapsulation { get; set; }
+    
     
     // Needed so _anotherLock is seen as a lock target
     public void UseAnotherLock()
@@ -35,7 +34,6 @@ public class Visibility
             _count++;
         }
     }
-    
     
     // --------- WARNINGS ----------
     
@@ -64,7 +62,8 @@ public class Visibility
     // Should Flag warnings (inconsistent lock usage) 
     public void SetCountLocked(int count)
     {
-        _count = count;
+        lock (_anotherLock) 
+            _count = count;
     }
     
     // Should Flag warnings (no lock usage) 

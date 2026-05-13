@@ -14,6 +14,9 @@ PROJECT_ROOT="/Users/asgerlysdahl/RiderProjects/ThesisMemoryModelTesting/ThreadS
 
 cd "$PROJECT_ROOT"
 
+echo "☢️ Nuking bin and obj folders..."
+find . -type d \( -name "bin" -o -name "obj" \) -exec rm -rf {} +
+
 echo "🧹 Cleaning and Restoring..."
 dotnet clean
 dotnet restore
@@ -29,5 +32,8 @@ dotnet build ThreadSafetClassAnalyser.CodeFixes/ThreadSafetClassAnalyser.CodeFix
 
 echo "📦 Building Package..."
 dotnet build ThreadSafetClassAnalyser.Package/ThreadSafetClassAnalyser.Package.csproj -c Debug
+
+#echo "🎯 Building Target App..."
+#dotnet build DummyApp/DummyApp.csproj -c Debug
 
 echo "✅ Build complete!"

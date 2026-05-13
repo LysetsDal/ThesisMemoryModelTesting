@@ -3,9 +3,9 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 using ThreadSafetClassAnalyser.Model;
+using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
 
 namespace ThreadSafetClassAnalyser
@@ -13,77 +13,159 @@ namespace ThreadSafetClassAnalyser
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class CorrectlySynchronizedAnalyzer : DiagnosticAnalyzer
     {
-        private const string Category = "CorrectlySynchronized";
-
-        // --- FieldUsed ---
-        public const string FieldUsedDiagnosticId = "FieldUsed";
-        private static readonly AnalyserMetadata FieldUsedMetadata = new AnalyserMetadata(FieldUsedDiagnosticId);
-
-        private static readonly DiagnosticDescriptor FieldUsedRule =
-            new DiagnosticDescriptor(
-                FieldUsedDiagnosticId,
-                FieldUsedMetadata.Title,
-                FieldUsedMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: FieldUsedMetadata.Description);
-        
-        // --- ConflictingAccessThread ---
-
-        private const string ConflictingAccessThreadId = "ConflictingAccessThread";
-
-        private static readonly AnalyserMetadata conflictingAccessThreadMetadata =
-            new AnalyserMetadata(ConflictingAccessThreadId);
-
-        private static readonly DiagnosticDescriptor ConflictingAccessThreadRule =
-            new DiagnosticDescriptor(
-                ConflictingAccessThreadId,
-                conflictingAccessThreadMetadata.Title,
-                conflictingAccessThreadMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: conflictingAccessThreadMetadata.Description);
-        
-        
-        // --- Test Rule ---
-        private const string TestRuleId = "TestRule";
-
-        private static readonly AnalyserMetadata TestRuleMetadata = 
-            new AnalyserMetadata(TestRuleId);
-        
-        private static readonly DiagnosticDescriptor TestRule =
-            new DiagnosticDescriptor(
-                TestRuleId,
-                TestRuleMetadata.Title,
-                TestRuleMetadata.MessageFormat,
-                Category,
-                DiagnosticSeverity.Warning,
-                isEnabledByDefault: true,
-                description: TestRuleMetadata.Description
-            );
-        
         // --- Register all supported diagnostics ---
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
-        {
-            [DebuggerStepThrough()]
-            get =>
-                ImmutableArray.Create(
-                    FieldUsedRule,
-                    ConflictingAccessThreadRule
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+            ImmutableArray.Create(
+                    CorrectlySynchronizedRules.ConflictingAccessThreadRule,
+                    CorrectlySynchronizedRules.VolatileReorderingRule,
+                    CorrectlySynchronizedRules.LockOnClassInstanceRule
                 );
-        }
-
+        
         public override void Initialize(AnalysisContext context)
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
 
             // Register the Actions here.
+            // [Internal] (ConflictingAccessThreadRule)
+            // Flags Conflicting accesses on class fields and properties in Thread bodies
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInThreads, SyntaxKind.ClassDeclaration);
+            
+            // [Internal] (ConflictingAccessThreadRule)
+            // Flags Conflicting accesses on class fields and properties in Task bodies
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInTasks, SyntaxKind.ClassDeclaration);
+            
+            // [Internal] (VolatileReorderingRule)
+            // Flags method bodies with possible volatile reorderings (Independent Store/Load reordering Example)
+            context.RegisterSyntaxNodeAction(AnalyzeVolatileReordering, SyntaxKind.ClassDeclaration);
+
+            // [Internal] (LockOnClassInstanceRule)
+            // Flags methods in classes that use 'this' (class instance) as a lock target
+            context.RegisterSyntaxNodeAction(AnalyzeLockThis, SyntaxKind.ClassDeclaration);
+            
         }
+        
+        // =============================================================
+        // ============== LOCKING ON THE 'THIS' INSTANCE ===============
+        // =============================================================
+        private static void AnalyzeLockThis(SyntaxNodeAnalysisContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+
+            // 1. Guard: Only run if the class is annotated with [ThreadSafe]
+            if (classSymbol == null || !AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) 
+                return;
+
+            // 2. Use utility to find all locks and their associations
+            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+
+            foreach (var associations in lockMap.Values)
+            {
+                foreach (var association in associations)
+                {
+                    var lockStmt = association.Lock;
+                    var isLockThis = false;
+
+                    // Direct check for 'lock(this)'
+                    if (lockStmt.Expression is ThisExpressionSyntax)
+                    {
+                        isLockThis = true;
+                    }
+                    // Semantic check to see if the expression resolves to the class instance
+                    else
+                    {
+                        var lockSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                        if (SymbolEqualityComparer.Default.Equals(lockSymbol, classSymbol))
+                        {
+                            isLockThis = true;
+                        }
+                    }
+
+                    if (!isLockThis) continue;
+                    
+                    // 3. Extract the name of the method/member containing the lock
+                    // We use your existing GetBodyName helper for consistent naming
+                    var enclosingMemberNode = lockStmt.Ancestors()
+                        .FirstOrDefault(a => a is MemberDeclarationSyntax || a is AccessorDeclarationSyntax);
+                        
+                    var displayMethodName = enclosingMemberNode != null 
+                        ? AnalyzerUtils.GetBodyName(enclosingMemberNode) 
+                        : (association.MemberContainingLock?.Name ?? "unknown");
+                        
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        CorrectlySynchronizedRules.LockOnClassInstanceRule,
+                        lockStmt.Expression.GetLocation(),
+                        classSymbol.Name,  // {0}
+                        displayMethodName                   // {1}
+                    ));
+                }
+            }
+        }
+        
+        
+        
+        // =============================================================
+        // ========= POSSIBLE VOLATILE STORE LOAD REORDERING ===========
+        // =============================================================
+        private static void AnalyzeVolatileReordering(SyntaxNodeAnalysisContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+
+            // Guard: Only run if the class is annotated with [ThreadSafe]
+            if (classSymbol == null || !AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) 
+                return;
+
+            // To detect reordering, we scan every method and lambda body in the class
+            var bodies = classDecl.DescendantNodes()
+                .Where(n => n is MethodDeclarationSyntax || n is AnonymousFunctionExpressionSyntax);
+
+            foreach (var body in bodies)
+            {
+                var methodName = AnalyzerUtils.GetBodyName(body);
+
+                // 1. Establish Program Order (PO) within this specific method/lambda body 
+                var identifiers = body.DescendantNodes().OfType<IdentifierNameSyntax>().ToList();
+
+                for (var i = 0; i < identifiers.Count; i++)
+                {
+                    var idWrite = identifiers[i];
+                    var writeSymbol = semanticModel.GetSymbolInfo(idWrite).Symbol as IFieldSymbol;
+
+                    // Step: Filter for Volatile Write
+                    if (writeSymbol == null || !writeSymbol.IsVolatile || !AnalyzerUtils.IsWriteAccess(idWrite))
+                        continue;
+
+                    for (var j = i + 1; j < identifiers.Count; j++)
+                    {
+                        var idRead = identifiers[j];
+                        var readSymbol = semanticModel.GetSymbolInfo(idRead).Symbol as IFieldSymbol;
+
+                        // Step: Identify Volatile Read occurring later in PO 
+                        if (readSymbol == null || !readSymbol.IsVolatile || AnalyzerUtils.IsWriteAccess(idRead))
+                            continue;
+
+                        // 2. Check for Full Fences (Intervening synchronization) 
+                        // We pass 'body' as the root to check for barriers between the write and read
+                        if (!AnalyzerUtils.HasFullFenceBetween(body, idWrite, idRead, semanticModel))
+                        {
+                            // 3. Flag Total Order Violation
+                            context.ReportDiagnostic(Diagnostic.Create(
+                                CorrectlySynchronizedRules.VolatileReorderingRule,
+                                idRead.GetLocation(),
+                                readSymbol.Name,
+                                methodName,
+                                writeSymbol.Name));
+                        }
+                    }
+                }
+            }
+        }
+        
+        
         // =============================================================
         // ========= CONFLICTING ACCESSES IN TASKS AND THREADS =========
         // =============================================================
@@ -104,8 +186,7 @@ namespace ThreadSafetClassAnalyser
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
             
             // Check that class was found
-            if (classSymbol == null) 
-                return;
+            if (classSymbol == null) return;
 
             // Guard for the [ThreadSafe] annotation
             if (!AnalyzerUtils.IsTargetInThreadSafeClass(classSymbol)) return;
@@ -162,8 +243,7 @@ namespace ThreadSafetClassAnalyser
                         var info2 = t2.AccessMap[conflict];
 
                         if (AnalyzerUtils.IsCorrectlySynchronized(info1, info2)) continue;
-
-                        // Report
+                        
                         ReportThreadConflict(context, t1, t2, conflict.Name);
                     }
                 }
@@ -177,12 +257,12 @@ namespace ThreadSafetClassAnalyser
             string fieldName)
         {
             context.ReportDiagnostic(Diagnostic.Create(
-                ConflictingAccessThreadRule,
+                CorrectlySynchronizedRules.ConflictingAccessThreadRule,
                 t1.Syntax.GetLocation(),
                 fieldName, t1.Name, t2.Name));
 
             context.ReportDiagnostic(Diagnostic.Create(
-                ConflictingAccessThreadRule,
+                CorrectlySynchronizedRules.ConflictingAccessThreadRule,
                 t2.Syntax.GetLocation(),
                 fieldName, t2.Name, t1.Name));
         }

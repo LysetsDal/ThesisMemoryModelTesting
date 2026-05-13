@@ -242,5 +242,59 @@ namespace ThreadSafetClassAnalyser {
                 return ResourceManager.GetString("SP003Description", resourceCulture);
             }
         }
+        
+        internal static string VolatileReorderingTitle {
+            get {
+                return ResourceManager.GetString("VolatileReorderingTitle", resourceCulture);
+            }
+        }
+        
+        internal static string VolatileReorderingMessageFormat {
+            get {
+                return ResourceManager.GetString("VolatileReorderingMessageFormat", resourceCulture);
+            }
+        }
+        
+        internal static string VolatileReorderingDescription {
+            get {
+                return ResourceManager.GetString("VolatileReorderingDescription", resourceCulture);
+            }
+        }
+        
+        internal static string InconsistentLockUseTitle {
+            get {
+                return ResourceManager.GetString("InconsistentLockUseTitle", resourceCulture);
+            }
+        }
+        
+        internal static string InconsistentLockUseDescription {
+            get {
+                return ResourceManager.GetString("InconsistentLockUseDescription", resourceCulture);
+            }
+        }
+        
+        internal static string InconsistentLockUseMessageFormat {
+            get {
+                return ResourceManager.GetString("InconsistentLockUseMessageFormat", resourceCulture);
+            }
+        }
+        
+        internal static string LockOnClassInstanceTitle {
+            get {
+                return ResourceManager.GetString("LockOnClassInstanceTitle", resourceCulture);
+            }
+        }
+        
+        internal static string LockOnClassInstanceDescription {
+            get {
+                return ResourceManager.GetString("LockOnClassInstanceDescription", resourceCulture);
+            }
+        }
+        
+        internal static string LockOnClassInstanceMessageFormat {
+            get {
+                return ResourceManager.GetString("LockOnClassInstanceMessageFormat", resourceCulture);
+            }
+        }
     }
 }
