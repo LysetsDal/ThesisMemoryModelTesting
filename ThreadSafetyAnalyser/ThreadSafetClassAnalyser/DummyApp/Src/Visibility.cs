@@ -44,11 +44,13 @@ public class Visibility
     {
         get
         {
-            lock (_lock) return _count;
+            lock (_lock) 
+                return _count;
         }
         set
         {
-            lock (_lock) _count = value;
+            lock (_lock) 
+                _count = value;
         }
     }
 

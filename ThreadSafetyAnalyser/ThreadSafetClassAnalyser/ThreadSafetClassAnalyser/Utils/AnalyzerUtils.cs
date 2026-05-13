@@ -101,65 +101,49 @@ namespace ThreadSafetClassAnalyser.Utils
         /// <param name="semanticModel">The Semantic model of the classSymbol</param>
         /// <returns>A dictionary of [Key: LockSymbols, Value: <see cref="LockAssociation"/>]</returns>
         public static ImmutableDictionary<ISymbol, ImmutableArray<LockAssociation>> 
-            GetClassLockAssociationDict(
-                INamedTypeSymbol classSymbol, 
-                SemanticModel semanticModel
-                )
+            GetClassLockAssociationDict(INamedTypeSymbol classSymbol, SemanticModel semanticModel)
         {
-            // Use the custom LockAssociation struct instead of Tuple
             var lockMapping = new Dictionary<ISymbol, List<LockAssociation>>(SymbolEqualityComparer.Default);
-            
+    
+            // Get the current tree we are allowed to analyze
+            var currentTree = semanticModel.SyntaxTree;
+
             foreach (var location in classSymbol.DeclaringSyntaxReferences)
             {
+                // Only look at the syntax if it belongs to the tree the SemanticModel knows about
+                if (location.SyntaxTree != currentTree) continue;
+
                 var classSyntax = location.GetSyntax() as ClassDeclarationSyntax;
                 if (classSyntax == null) continue;
 
-                // Find every lock statement inside this class (handles partial classes via DeclaringSyntaxReferences)
                 var allLocks = classSyntax.DescendantNodes().OfType<LockStatementSyntax>();
 
                 foreach (var lockStmt in allLocks)
                 {
-                    // Determine WHAT is being locked (the expression inside the parentheses)
+                    // This is safe because we verified the tree matches
                     var lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
                     if (lockObjSymbol == null) continue;
 
-                    
-                    // Determine the Enclosing Member (Method, Property Accessor, Constructor, etc.)
                     var enclosingMember = lockStmt.Ancestors()
-                        .FirstOrDefault(a => 
-                            a is MemberDeclarationSyntax || 
-                            a is AccessorDeclarationSyntax || 
-                            a is LambdaExpressionSyntax);
+                        .FirstOrDefault(a => a is MemberDeclarationSyntax || a is AccessorDeclarationSyntax || a is LambdaExpressionSyntax);
 
-                    
-                    // Get the Symbol for the member containing the lock
                     ISymbol memberSymbol = null;
                     if (enclosingMember != null)
                     {
-                        if (enclosingMember is LambdaExpressionSyntax lambda)
-                        {
-                            // 2. For Lambdas, use GetSymbolInfo to get the anonymous method symbol
-                            memberSymbol = semanticModel.GetSymbolInfo(lambda).Symbol;
-                        }
-                        else
-                        {
-                            // 3. For standard members, use GetDeclaredSymbol
-                            memberSymbol = semanticModel.GetDeclaredSymbol(enclosingMember);
-                        }
+                        memberSymbol = (enclosingMember is LambdaExpressionSyntax lambda)
+                            ? semanticModel.GetSymbolInfo(lambda).Symbol
+                            : semanticModel.GetDeclaredSymbol(enclosingMember);
                     }
-                    
-
-                    
+            
                     if (!lockMapping.ContainsKey(lockObjSymbol))
                     {
                         lockMapping[lockObjSymbol] = new List<LockAssociation>();
                     }
-                    
+            
                     lockMapping[lockObjSymbol].Add(new LockAssociation(memberSymbol, lockStmt));
                 }
             }
-            
-            // Convert the dictionary to an immutable version for safe analyzer use
+    
             return lockMapping.ToImmutableDictionary(
                 kvp => kvp.Key, 
                 kvp => kvp.Value.ToImmutableArray(), 

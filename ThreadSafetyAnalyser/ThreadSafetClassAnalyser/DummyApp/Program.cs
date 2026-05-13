@@ -41,14 +41,14 @@ internal static class Program
 
     public static Visibility Connect()
     {
-        var result = new Visibility();
+        var visibility = new Visibility();
 
         try
         {
-            result.PublicPropBreakingEncapsulation = false;
-            var tmp = result.PrivateReadonlyProp;
+            visibility.PublicPropBreakingEncapsulation = false;
+            var tmp = visibility.PrivateReadonlyProp;
 
-            var tmp2 = result.PublicPropWithSynchronization;
+            var tmp2 = visibility.PublicPropWithSynchronization;
 
         }
         catch (Exception e)
@@ -56,7 +56,7 @@ internal static class Program
             Console.WriteLine(e.Message);
         }
 
-        return result;
+        return visibility;
     }
     
 }
