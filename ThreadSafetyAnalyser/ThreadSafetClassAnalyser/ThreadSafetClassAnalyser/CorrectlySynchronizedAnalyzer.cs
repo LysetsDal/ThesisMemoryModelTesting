@@ -51,15 +51,15 @@ namespace ThreadSafetClassAnalyser
         private static void AnalyzeLockThis(SyntaxNodeAnalysisContext context)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node;
-            var semanticModel = context.SemanticModel;
-            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            var compilation = context.Compilation;
+            var classSymbol = context.SemanticModel.GetDeclaredSymbol(classDecl);
 
             // 1. Guard: Only run if the class is annotated with [ThreadSafe]
             if (classSymbol == null || !ThreadSafeValidator.ShouldValidateTarget(classSymbol)) 
                 return;
 
             // 2. Use utility to find all locks and their associations
-            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, compilation);
 
             foreach (var associations in lockMap.Values)
             {
@@ -76,7 +76,7 @@ namespace ThreadSafetClassAnalyser
                     // Semantic check to see if the expression resolves to the class instance
                     else
                     {
-                        var lockSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                        var lockSymbol = context.SemanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
                         if (SymbolEqualityComparer.Default.Equals(lockSymbol, classSymbol))
                         {
                             isLockThis = true;
@@ -184,7 +184,9 @@ namespace ThreadSafetClassAnalyser
             var classDecl = (ClassDeclarationSyntax)context.Node;
             var semanticModel = context.SemanticModel;
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
-            
+            var compilation = context.Compilation;
+
+
             // Check that class was found
             if (classSymbol == null) return;
 
@@ -199,7 +201,7 @@ namespace ThreadSafetClassAnalyser
             if (threadCreations.Count < 2) return;
             
             var classLocks =
-                AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+                AnalyzerUtils.GetClassLockAssociationDict(classSymbol, compilation);
             
             // Map each thread to the fields it accesses
             var analyzedThreads = threadCreations.Select(tc => 

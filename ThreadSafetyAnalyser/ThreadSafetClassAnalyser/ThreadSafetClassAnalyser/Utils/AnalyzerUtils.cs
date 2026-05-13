@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Linq;
 using ThreadSafetClassAnalyser.Model;
+using System;
 
 
 namespace ThreadSafetClassAnalyser.Utils
@@ -102,8 +103,8 @@ namespace ThreadSafetClassAnalyser.Utils
         /// <returns>A dictionary of [Key: LockSymbols, Value: <see cref="LockAssociation"/>]</returns>
         public static ImmutableDictionary<ISymbol, ImmutableArray<LockAssociation>> 
             GetClassLockAssociationDict(
-                INamedTypeSymbol classSymbol, 
-                SemanticModel semanticModel
+                INamedTypeSymbol classSymbol,
+                Compilation compilation
                 )
         {
             // Use the custom LockAssociation struct instead of Tuple
@@ -114,13 +115,40 @@ namespace ThreadSafetClassAnalyser.Utils
                 var classSyntax = location.GetSyntax() as ClassDeclarationSyntax;
                 if (classSyntax == null) continue;
 
+                var semanticModel = compilation.GetSemanticModel(classSyntax.SyntaxTree);
+
                 // Find every lock statement inside this class (handles partial classes via DeclaringSyntaxReferences)
                 var allLocks = classSyntax.DescendantNodes().OfType<LockStatementSyntax>();
 
                 foreach (var lockStmt in allLocks)
                 {
                     // Determine WHAT is being locked (the expression inside the parentheses)
-                    var lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                    ISymbol lockObjSymbol;
+                    try
+                    {
+                        lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        var lockExprText   = lockStmt.Expression.ToString();
+                        var lockLocation   = lockStmt.GetLocation();
+                        var syntaxTreePath = lockStmt.SyntaxTree.FilePath;
+                        var modelTreePath  = semanticModel.SyntaxTree.FilePath;
+                        var treeMatch      = lockStmt.SyntaxTree == semanticModel.SyntaxTree;
+
+                        throw new InvalidOperationException(
+                            $@"
+                            [GetClassLockAssociationDict] SemanticModel/SyntaxTree mismatch while resolving lock expression.
+                            
+                              Class       : {classSymbol.ToDisplayString()}
+                              Lock expr   : {lockExprText}
+                              Lock at     : {lockLocation.GetLineSpan()}
+                              Node tree   : {syntaxTreePath}
+                              Model tree  : {modelTreePath}
+                              Trees match : {treeMatch}
+                            ", ex);
+                    }
+
                     if (lockObjSymbol == null) continue;
 
                     

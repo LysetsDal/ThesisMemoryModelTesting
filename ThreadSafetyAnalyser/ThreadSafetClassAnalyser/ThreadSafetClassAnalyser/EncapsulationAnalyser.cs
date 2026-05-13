@@ -75,7 +75,7 @@ namespace ThreadSafetClassAnalyser
             var semanticModel = context.Compilation.GetSemanticModel(firstRef.SyntaxTree);
             
             // 1. Get the map of symbols actually used for locking
-            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, context.Compilation);
             var allLockSymbols = lockMap.Keys.ToImmutableHashSet(SymbolEqualityComparer.Default);
 
             if (allLockSymbols.IsEmpty) return;
