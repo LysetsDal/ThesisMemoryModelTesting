@@ -4,7 +4,6 @@ using DummyApp.Src;
 
 namespace DummyApp;
 
-// [ThreadSafe]
 internal static class Program
 {
     private static readonly object Lock = new();
@@ -19,8 +18,6 @@ internal static class Program
 
         // Should not flag if readonly 
         var externalAccess = visibility._transactionReadOnly;
-        
-        
         
         lock (Lock)
         {

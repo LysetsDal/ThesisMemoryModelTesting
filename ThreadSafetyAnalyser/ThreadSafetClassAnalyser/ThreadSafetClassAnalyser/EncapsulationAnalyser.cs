@@ -25,7 +25,6 @@ namespace ThreadSafetClassAnalyser
                 EncapsulationRules.TestRuleRule
             );
         
-        
         // Internal = The diagnostic message is internally visible inside the class with the field or method.
         // External = The diagnostic rule is externally visible (at the call-site class) but not inside the class with the field or method.
         public override void Initialize(AnalysisContext context)
@@ -49,7 +48,7 @@ namespace ThreadSafetClassAnalyser
             // This rule flags Methods at the callsite, if they don't use an accessor with a lock.
             context.RegisterSyntaxNodeAction(AnalyzeCallingMemberAccessWithLock, SyntaxKind.SimpleMemberAccessExpression);
             
-            // [Internal] (InternalFieldNoLockRule)
+            // [Internal] (InternalFieldNoLockRule) or (InconsistentLockUseRule)
             // This rule flags fields internally, if they have public accessors without synchronization.
             context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.FieldDeclaration);
             context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.PropertyDeclaration);
@@ -234,6 +233,10 @@ namespace ThreadSafetClassAnalyser
             // If it does it is safe
             if (callSiteAncestorLock != null) return;
             
+            // 
+            if (AnalyzerUtils.IsInternallySynchronized(methodSymbol, context.SemanticModel)) 
+                return;
+            
             // No lock found at all!
             var diagnostic = Diagnostic.Create(
                 EncapsulationRules.FieldDoesNotUseLockRule,
@@ -310,7 +313,12 @@ namespace ThreadSafetClassAnalyser
                 foreach (var info in accessInfos)
                 {
                     var methodSymbol = context.SemanticModel.GetDeclaredSymbol(info.Method);
-                    if (methodSymbol?.DeclaredAccessibility != Accessibility.Public) continue;
+                    
+                    // Check if the field is used as an argument to one of the atomic methods
+                    if (AnalyzerUtils.IsInsideThreadSafePrimitive(info.Usage, context.SemanticModel))
+                    {
+                        continue;
+                    }
 
                     // SCENARIO A: No lock used
                     if (info.LockSymbol == null)

@@ -9,9 +9,7 @@ namespace DummyApp.Src;
 // [ThreadSafe]
 public class ComplexClass
 {
-    
     private readonly object _lock = new();
-    private readonly object _lock2 = new();
     
     private List<AuditEvent> _events = new(); 
     

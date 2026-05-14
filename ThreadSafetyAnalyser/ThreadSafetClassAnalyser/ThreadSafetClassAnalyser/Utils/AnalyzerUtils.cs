@@ -252,6 +252,79 @@ namespace ThreadSafetClassAnalyser.Utils
             return model.GetSymbolInfo(lockStatement.Expression).Symbol;
         }
         
+        public static bool IsInternallySynchronized(
+            IMethodSymbol methodSymbol, 
+            SemanticModel semanticModel, 
+            int depth = 3, 
+            HashSet<IMethodSymbol> visited = null)
+        {
+            // 1. Terminal cases
+            if (depth <= 0 || methodSymbol == null) return false;
+            
+            // Initialize visited set if this is the first call (root of the recursion)
+            if (visited == null)
+            {
+                visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            }
+
+            // Prevent infinite recursion loops
+            if (!visited.Add(methodSymbol)) return false;
+
+            // 2. Check if the method IS a BCL atomic primitive (Metadata check)
+            var typeName = methodSymbol.ContainingType?.ToDisplayString();
+            if (typeName == KnownTypes.FullInterlockedName || typeName == KnownTypes.FullVolatileName)
+                return true;
+
+            // 3. Check for source code. If no source exists (e.g. library), we can't look inside.
+            var syntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+            if (syntaxRef == null) return false;
+
+            var syntax = syntaxRef.GetSyntax();
+
+            // 4. Check for immediate synchronization in this method body
+            // Direct usage of the lock keyword
+            if (syntax.DescendantNodes().OfType<LockStatementSyntax>().Any())
+                return true;
+
+            // 5. Look for method calls inside this body
+            var invocations = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>();
+            foreach (var invocation in invocations)
+            {
+                var invokedSymbol = semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+                if (invokedSymbol == null) continue;
+
+                // Is the called method Interlocked or Volatile?
+                var containingTypeName = invokedSymbol.ContainingType?.ToDisplayString();
+                if (containingTypeName == KnownTypes.FullInterlockedName || 
+                    containingTypeName == KnownTypes.FullVolatileName)
+                {
+                    return true;
+                }
+
+                // RECURSION: Step into the called method to see if it provides synchronization
+                if (IsInternallySynchronized(invokedSymbol, semanticModel, depth - 1, visited))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        
+        public static bool IsInsideThreadSafePrimitive(SyntaxNode node, SemanticModel semanticModel)
+        {
+            // Walk up the tree to see if this identifier is an argument in a method call
+            var invocation = node.Ancestors().OfType<InvocationExpressionSyntax>().FirstOrDefault();
+            if (invocation == null) return false;
+
+            var symbol = semanticModel.GetSymbolInfo(invocation).Symbol;
+            if (symbol == null) return false;
+
+            var containingTypeName = symbol.ContainingType?.ToDisplayString();
+
+            return containingTypeName == KnownTypes.FullInterlockedName || 
+                   containingTypeName == KnownTypes.FullVolatileName;
+        }
         
         // ========================================================================================
         // =========================== CORRECTLY SYNCHRONIZED ANALYSER ============================
