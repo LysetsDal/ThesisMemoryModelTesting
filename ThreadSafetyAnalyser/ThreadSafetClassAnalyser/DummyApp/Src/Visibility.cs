@@ -6,7 +6,7 @@ namespace DummyApp.Src;
 #pragma warning disable CS0414 // Field is assigned but its value is never used
 [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
-// [ThreadSafe]
+[ThreadSafe]
 public class Visibility
 {
     private readonly object _lock = new();
@@ -88,12 +88,13 @@ public class Visibility
         return _countReadOnly;
     }
     
-    // Should Flag warnings
+    // Should flag (noLock)
     public int GetTransactions()
     { 
         return _transactions;
     }
     
+    // Should flag (noLock)
     public void SetTransactions(int count)
     {
         _transactions = count;

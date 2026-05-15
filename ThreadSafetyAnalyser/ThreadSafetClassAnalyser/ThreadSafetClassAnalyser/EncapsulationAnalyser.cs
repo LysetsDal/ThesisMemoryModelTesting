@@ -50,8 +50,8 @@ namespace ThreadSafetClassAnalyser
             
             // [Internal] (InternalFieldNoLockRule) or (InconsistentLockUseRule)
             // This rule flags fields internally, if they have public accessors without synchronization.
-            context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.FieldDeclaration);
-            context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessWithLock, SyntaxKind.PropertyDeclaration);
+            context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessLockUsage, SyntaxKind.FieldDeclaration);
+            context.RegisterSyntaxNodeAction(AnalyzeInternalFieldAccessLockUsage, SyntaxKind.PropertyDeclaration);
             
             // [Internal] (LockObjectExposedRule)
             // Finds all locks in a namedType (a class) that are exposed through public accessor.
@@ -248,11 +248,13 @@ namespace ThreadSafetClassAnalyser
         }
         
         /// <summary>
-        /// Analyses if a field in a source class can be accessed through any field usages without a lock.
-        /// Warning is displayed internally in the class.
+        /// Analyses if a field or prop in a source class can be accessed through any field usages
+        /// without a lock. Warning is displayed internally in the class
         /// </summary>
-        /// <param name="context"> A FieldDeclarationSyntax node from the root analysis context </param> 
-        private static void AnalyzeInternalFieldAccessWithLock(SyntaxNodeAnalysisContext context)
+        /// <param name="context">A FieldDeclaration or PropertyDeclaration syntax node from the
+        /// root analysis context
+        /// </param> 
+        private static void AnalyzeInternalFieldAccessLockUsage(SyntaxNodeAnalysisContext context)
         {
             if (!ThreadSafeValidator.ShouldValidate(context)) return;
             
@@ -283,10 +285,25 @@ namespace ThreadSafetClassAnalyser
             }
 
             if (symbolsToAnalyze.Count == 0) return;
-
+            
             // 2. Run analysis for each identified symbol
             foreach (var memberSymbol in symbolsToAnalyze)
             {
+                // Check if the declaration is readonly
+                var isInherentlyReadOnly = false;
+                if (memberSymbol is IFieldSymbol field)
+                {
+                    isInherentlyReadOnly = field.IsReadOnly;
+                }
+                else if (memberSymbol is IPropertySymbol prop)
+                {
+                    isInherentlyReadOnly = prop.IsReadOnly || prop.SetMethod == null;
+                }
+
+                // If it's read-only, it's inherently thread-safe to read outside constructors.
+                // We can skip collecting and analyzing usages entirely!
+                if (isInherentlyReadOnly) continue;
+                
                 // Collect all usages of this specific field/property in the class
                 var accessInfos = classDecl.DescendantNodes()
                     .OfType<IdentifierNameSyntax>()
@@ -313,12 +330,12 @@ namespace ThreadSafetClassAnalyser
                 foreach (var info in accessInfos)
                 {
                     var methodSymbol = context.SemanticModel.GetDeclaredSymbol(info.Method);
+                    if (AnalyzerUtils.IsMethodPrivate(methodSymbol))
+                        continue;
                     
                     // Check if the field is used as an argument to one of the atomic methods
                     if (AnalyzerUtils.IsInsideThreadSafePrimitive(info.Usage, context.SemanticModel))
-                    {
                         continue;
-                    }
 
                     // SCENARIO A: No lock used
                     if (info.LockSymbol == null)

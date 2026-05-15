@@ -83,17 +83,6 @@ namespace ThreadSafetClassAnalyser.Utils
                        attr.AttributeClass?.Name == "ThreadSafe";
             });
         }
-
-        /// <summary>
-        /// Gets the first variable in a field declaration.
-        /// </summary>
-        /// <param name="fieldDecl"> The field declaration you want to get a variable name from</param>
-        /// <returns> A variable declaration syntax context </returns>
-        /// <remarks> If multiple symbol names are given (i.e. int a, b;) it will return the first one.</remarks>
-        public static VariableDeclaratorSyntax GetFirstVariableInFieldDeclaration(FieldDeclarationSyntax fieldDecl)
-        {
-            return fieldDecl.Declaration.Variables.FirstOrDefault();
-        }
         
         /// <summary>
         /// Returns a dictionary of Locks, and a LockAssociation list of all members where this lock is used as a target (e.g. lock($target) { ... } )
@@ -184,10 +173,9 @@ namespace ThreadSafetClassAnalyser.Utils
         {
             var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
 
-            LockStatementSyntax parentLock = null;
-            if (containingMethodSyntaxRef == null) return parentLock;
+            if (containingMethodSyntaxRef == null) return null;
             var methodDecl = containingMethodSyntaxRef.GetSyntax();
-            parentLock = methodDecl.DescendantNodes()
+            var parentLock = methodDecl.DescendantNodes()
                 .OfType<LockStatementSyntax>()
                 .FirstOrDefault();
 
@@ -212,10 +200,9 @@ namespace ThreadSafetClassAnalyser.Utils
                 .OfType<LockStatementSyntax>()
                 .FirstOrDefault();
             
-            if (lockStmt == null) return null;
-
-            // Get the symbol of what is being locked (e.g., _syncObj)
-            return model.GetSymbolInfo(lockStmt.Expression).Symbol;
+            return lockStmt == null ? null :
+                // Get the symbol of what is being locked (e.g., _syncObj)
+                model.GetSymbolInfo(lockStmt.Expression).Symbol;
         }
         
         /// <summary>
@@ -349,7 +336,7 @@ namespace ThreadSafetClassAnalyser.Utils
             return accessed;
         }
 
-        public static void PopulateAccessesRecursive(
+        private static void PopulateAccessesRecursive(
             SyntaxNode node,
             SemanticModel model, 
             IDictionary<ISymbol, AccessInfo> accessed, 
@@ -412,12 +399,15 @@ namespace ThreadSafetClassAnalyser.Utils
             }
 
             // 2. Check for increment/decrement: current++;
-            if (parent is PostfixUnaryExpressionSyntax || parent is PrefixUnaryExpressionSyntax)
-            {
+            return parent is PostfixUnaryExpressionSyntax || parent is PrefixUnaryExpressionSyntax;
+        }
+        
+        public static bool IsMethodPrivate(IMethodSymbol method)
+        {
+            if (method == null)
                 return true;
-            }
-
-            return false;
+            
+            return method.DeclaredAccessibility != Accessibility.Public;
         }
 
         private static void UpdateAccessMap(IDictionary<ISymbol, AccessInfo> map, ISymbol symbol, AccessType type, ISymbol currentLock)
@@ -485,7 +475,7 @@ namespace ThreadSafetClassAnalyser.Utils
 
             foreach (var node in nodesInBetween)
             {
-                // Check for Thread.MemoryBarrier() [cite: 240]
+                // Check for Thread.MemoryBarrier()
                 if (node is InvocationExpressionSyntax invocation)
                 {
                     var symbol = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
@@ -493,12 +483,12 @@ namespace ThreadSafetClassAnalyser.Utils
                     {
                         var containingType = symbol.ContainingType.ToDisplayString();
                         // Barriers: Thread.MemoryBarrier, Interlocked operations, or entering a lock
-                        if (containingType == "System.Threading.Thread" && symbol.Name == "MemoryBarrier") return true;
-                        if (containingType == "System.Threading.Interlocked") return true;
+                        if (containingType == KnownTypes.FullThreadName && symbol.Name == KnownTypes.MemoryBarrier) return true;
+                        if (containingType == KnownTypes.FullInterlockedName) return true;
                     }
                 }
 
-                // Check for lock statements (Full fence on entry/exit) [cite: 159, 200]
+                // Check for lock statements (Full fence on entry/exit)
                 if (node is LockStatementSyntax) return true;
             }
 

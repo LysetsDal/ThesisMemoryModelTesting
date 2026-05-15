@@ -6,6 +6,7 @@ namespace ThreadSafetClassAnalyser.Utils
         public const string Thread = "Thread";
         public const string Volatile = "Volatile";
         public const string Interlocked = "Interlocked";
+        public const string MemoryBarrier = "MemoryBarrier";
         
         public const string FullTaskName = "System.Threading.Tasks.Task";
         public const string FullThreadName = "System.Threading.Thread";

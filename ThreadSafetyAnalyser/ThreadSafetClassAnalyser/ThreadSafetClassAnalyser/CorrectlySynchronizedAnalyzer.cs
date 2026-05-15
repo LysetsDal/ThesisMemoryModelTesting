@@ -148,6 +148,10 @@ namespace ThreadSafetClassAnalyser
                         if (readSymbol == null || !readSymbol.IsVolatile || AnalyzerUtils.IsWriteAccess(idRead))
                             continue;
 
+                        // GUARD: Skip if the volatile read is executed inside a lock statement
+                        if (AnalyzerUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null)
+                            continue;
+                        
                         // 2. Check for Full Fences (Intervening synchronization) 
                         // We pass 'body' as the root to check for barriers between the write and read
                         if (!AnalyzerUtils.HasFullFenceBetween(body, idWrite, idRead, semanticModel))
