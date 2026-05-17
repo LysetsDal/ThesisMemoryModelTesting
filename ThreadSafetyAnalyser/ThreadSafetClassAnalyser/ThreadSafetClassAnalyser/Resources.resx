@@ -262,6 +262,6 @@
     <value>Multiple class members access the same mutable field concurrently without a shared lock, where at least one operation is a write. This can introduce data races and memory reordering bugs</value>
   </data>
     <data name="ConflictingAccessRuleMessageFormat" xml:space="preserve">
-    <value>Unsynchronized access to field '{0}' detected. Method '{1}' conflicts with method '{2}' because they invoke concurrent operations on this shared state, and at least one operation is a write. Protect both members using a mutually exclusive lock object</value>
+    <value>Method '{1}()' can conflict with method '{2}()' on the shared state '{0}' because they lack proper synchronization and at least one method is a write operation.</value>
   </data>
 </root>

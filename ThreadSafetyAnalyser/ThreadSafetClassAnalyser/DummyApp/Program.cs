@@ -1,20 +1,27 @@
-using System;
 using Annotations;
 using DummyApp.Src;
+// ReSharper disable UnusedVariable
 
 namespace DummyApp;
 
+// [ThreadSafe]
 internal static class Program
 {
     private static readonly object Lock = new();
     
-    private static void Main(string[] args)
+    private static void Main()
     {
         // ----- Visibility -----
         var visibility = new Visibility();
         
-        // Should flag warning
+        // Should flag warning: FieldDoesNotUseLock
         visibility.GetCount();
+
+        // Prop should flag FieldAccessedExternally warning
+        var @break = visibility.PublicPropBreakingEncapsulation;
+        
+        // Field should flag FieldAccessedExternally warning
+        var @field = visibility._transactions;
 
         // Should not flag if readonly 
         var externalAccess = visibility._transactionReadOnly;
@@ -42,9 +49,11 @@ internal static class Program
 
         try
         {
+            // Should flag FieldAccessedExternally warning
             visibility.PublicPropBreakingEncapsulation = false;
             var tmp = visibility.PrivateReadonlyProp;
 
+            // Should not flag warning
             var tmp2 = visibility.PublicPropWithSynchronization;
 
         }

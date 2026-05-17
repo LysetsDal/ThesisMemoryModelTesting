@@ -1,27 +1,35 @@
 using System.Diagnostics.CodeAnalysis;
 using Annotations;
+// ReSharper disable InconsistentNaming
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable ConvertToConstant.Global
+// ReSharper disable ConvertToConstant.Local
+// ReSharper disable CheckNamespace
 
 namespace DummyApp.Src;
 
 #pragma warning disable CS0414 // Field is assigned but its value is never used
 [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
-[ThreadSafe]
+// [ThreadSafe]
 public class Visibility
 {
     private readonly object _lock = new();
     private readonly object _anotherLock = new();
     
+    // Should flag PublicFieldExposed warning
     public int _transactions = 0;
+    // Should flag PublicFieldExposed warning
     public readonly int _transactionReadOnly = 1;
     
     private int _count = 0;
     private readonly int _countReadOnly = 1;
     
-    
+    // Should flag PublicFieldExposed warning
     public bool PublicFieldBreakingEncapsulation = true;
     private bool _privateFieldBreakingEncapsulation = false;
     
+    // Should flag PublicFieldExposed warning
     public bool PublicPropBreakingEncapsulation { get; set; }
     private bool PrivatePropBreakingEncapsulation { get; set; }
     public bool PrivateReadonlyProp { get; } = true;
@@ -44,13 +52,17 @@ public class Visibility
     {
         get
         {
-            lock (_lock) 
+            lock (_lock)
+            {
                 return _count;
+            }
         }
         set
         {
-            lock (_lock) 
+            lock (_lock)
+            {
                 _count = value;
+            } 
         }
     }
 
@@ -59,6 +71,7 @@ public class Visibility
     {
         lock (_lock)
         {
+            // Should flag InconsistentLockUse warning
             return _count;
         }
     }
@@ -70,15 +83,15 @@ public class Visibility
             _count = count;
     }
     
-    // Should Flag warnings (no lock usage) 
     public int GetCount()
     { 
+        // Should flag InternalFieldNoLock warning
         return _count;
     }
     
-    // Should Flag warnings (no lock usage) 
     public void SetCount(int count)
     {
+        // Should flag InternalFieldNoLock warning
         _count = count;
     }   
     
@@ -88,21 +101,21 @@ public class Visibility
         return _countReadOnly;
     }
     
-    // Should flag (noLock)
     public int GetTransactions()
     { 
+        // Should flag InternalFieldNoLock warning
         return _transactions;
     }
     
-    // Should flag (noLock)
     public void SetTransactions(int count)
     {
+        // Should flag InternalFieldNoLock warning
         _transactions = count;
     }
     
-    // Should Flag warnings (returns sync obj)
     public object GetSyncObject()
     {
+        // Should flag LockObjectExposed warning
         return _anotherLock;
     }
     

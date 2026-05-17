@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+// ReSharper disable MemberCanBePrivate.Global
+#pragma warning disable RS2008
 
 namespace ThreadSafetClassAnalyser.Rules
 {
@@ -10,6 +12,7 @@ namespace ThreadSafetClassAnalyser.Rules
         public const string ConflictingAccessThreadId = "ConflictingAccessThread";
         public static readonly DiagnosticDescriptor ConflictingAccessThreadRule =
             Create(
+
                 ConflictingAccessThreadId,
                 Category.CorrectlySynchronized,
                 DiagnosticSeverity.Warning

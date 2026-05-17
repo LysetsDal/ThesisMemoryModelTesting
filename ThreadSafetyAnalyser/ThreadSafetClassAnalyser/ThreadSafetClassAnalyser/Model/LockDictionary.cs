@@ -84,7 +84,6 @@ namespace ThreadSafetClassAnalyser.Model
         /// </summary>
         /// <param name="memberContainingLock">The symbol of the enclosing method, property, or constructor.</param>
         /// <param name="lock">The syntax node of the lock statement being mapped.</param>
-        /// <param name="location">The location of the member.</param>
         public LockAssociation(ISymbol memberContainingLock, LockStatementSyntax @lock)
         {
             MemberContainingLock = memberContainingLock;

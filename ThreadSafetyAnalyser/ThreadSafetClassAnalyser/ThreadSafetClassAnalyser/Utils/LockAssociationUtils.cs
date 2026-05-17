@@ -135,9 +135,7 @@ namespace ThreadSafetClassAnalyser.Utils
         public static ISymbol GetEnclosingLockSymbol(SyntaxNode node, SemanticModel model)
         {
             var lockStatement = node.Ancestors().OfType<LockStatementSyntax>().FirstOrDefault();
-            if (lockStatement == null) return null;
-
-            return model.GetSymbolInfo(lockStatement.Expression).Symbol;
+            return lockStatement == null ? null : model.GetSymbolInfo(lockStatement.Expression).Symbol;
         }
         
     }

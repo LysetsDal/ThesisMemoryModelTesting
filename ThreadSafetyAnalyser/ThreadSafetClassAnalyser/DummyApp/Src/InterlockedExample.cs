@@ -3,7 +3,7 @@ using Annotations;
 
 namespace DummyApp.Src;
 
-[ThreadSafe]
+// [ThreadSafe]
 public class InterlockedExample
 {
     private int _counter = 0;

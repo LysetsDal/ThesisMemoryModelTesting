@@ -9,6 +9,7 @@ using ThreadSafetClassAnalyser.Model;
 using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
 // ReSharper disable RedundantAnonymousTypePropertyName
+// ReSharper disable UnusedType.Global
 
 namespace ThreadSafetClassAnalyser.Analysers
 {
@@ -18,11 +19,11 @@ namespace ThreadSafetClassAnalyser.Analysers
         // --- Register all supported diagnostics ---
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(
-                    CorrectlySynchronizedRules.ConflictingAccessThreadRule,
-                    CorrectlySynchronizedRules.VolatileReorderingRule,
-                    CorrectlySynchronizedRules.LockOnClassInstanceRule,
-                    CorrectlySynchronizedRules.ConflictingAccessRule
-                );
+                CorrectlySynchronizedRules.ConflictingAccessThreadRule,
+                CorrectlySynchronizedRules.VolatileReorderingRule,
+                CorrectlySynchronizedRules.LockOnClassInstanceRule,
+                CorrectlySynchronizedRules.ConflictingAccessRule
+            );
         
         public override void Initialize(AnalysisContext context)
         {
@@ -31,11 +32,8 @@ namespace ThreadSafetClassAnalyser.Analysers
 
             // Register the Actions here.
             // [Internal] (ConflictingAccessThreadRule)
-            // Flags Conflicting accesses on class fields and properties in Thread bodies
+            // Flags Conflicting accesses on class fields and properties in Thread or Task bodies
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInThreads, SyntaxKind.ClassDeclaration);
-            
-            // [Internal] (ConflictingAccessThreadRule)
-            // Flags Conflicting accesses on class fields and properties in Task bodies
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesInTasks, SyntaxKind.ClassDeclaration);
             
             // [Internal] (VolatileReorderingRule)
@@ -304,7 +302,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             // 2. Map out all the class locks
             var classLocks = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
 
-            // 3. Extract access and lock maps 
+            // 3. A list of all members (methods) in the class 
             var analyzedMembers = methodDeclarations.Select(methodDecl =>
             {
                 var methodSymbol = semanticModel.GetDeclaredSymbol(methodDecl);
@@ -320,9 +318,10 @@ namespace ThreadSafetClassAnalyser.Analysers
                 };
             }).Where(m => m != null).ToList();
             
+            // A set of distinct conflicts (MethodName, sharedState)
             var reportedConflicts = new HashSet<(MethodDeclarationSyntax Method, ISymbol Field)>();
 
-            // 4. Pairwise comparison matrix (Compare every method against every other method)
+            // 4. Pairwise comparison matrix (Compare every method against every other member)
             for (var i = 0; i < analyzedMembers.Count; i++)
             {
                 for (var j = i + 1; j < analyzedMembers.Count; j++)
@@ -339,8 +338,7 @@ namespace ThreadSafetClassAnalyser.Analysers
 
                     foreach (var conflict in conflicts)
                     {
-                        // If the field itself is inherently readonly, skip
-                        if (SyntaxUtils.IsConstOrReadOnlySymbol(conflict)) continue;
+                        if (!SyntaxUtils.IsMutableFieldOrProperty(conflict)) continue;
 
                         // Is this specific field protected by synchronization in the AccessMap?
                         var info1 = m1.AccessMap[conflict];

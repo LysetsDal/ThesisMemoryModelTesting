@@ -1,13 +1,12 @@
-// ReSharper disable RedundantUsingDirective
-using System.Threading;
-using System.Threading.Tasks;
 using Annotations;
 // ReSharper disable CheckNamespace
 // ReSharper disable UnusedVariable
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable UnusedMember.Local
 
 namespace DummyApp.Src;
 
-[ThreadSafe]
+// [ThreadSafe]
 public class CorrectlySynchronized
 {
     private int Count { get; set; } = 0;
@@ -47,7 +46,7 @@ public class CorrectlySynchronized
     public void TwoLockedThreads_DifferentLockSymbols()
     {
         // should flag ConflictingAccessThread warning
-        var t1 = new Thread(() =>
+        var thread1 = new Thread(() =>
         {
             lock (_csLock2)
             {
@@ -56,7 +55,7 @@ public class CorrectlySynchronized
         });
         
         // should flag ConflictingAccessThread warning
-        var t2 = new Thread(() =>
+        var thread2 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -69,13 +68,13 @@ public class CorrectlySynchronized
     public void TwoLockedThreads_OneLockSymbols()
     {
         // should flag ConflictingAccessThread warning
-        var t1 = new Thread(() =>
+        var thread3 = new Thread(() =>
         {
                 var tmp = GetOtherWork();
         });
         
         // should flag ConflictingAccessThread warning
-        var t2 = new Thread(() =>
+        var thread4 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -84,11 +83,11 @@ public class CorrectlySynchronized
         });
     }    
     
-    // Should flag a ConflictingAccessRule warning
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedThreads_SameLockSymbols()
     {
         // should not flag a warning
-        var t3 = new Thread(() =>
+        var thread5 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -97,7 +96,7 @@ public class CorrectlySynchronized
         });
         
         // should not flag a warning
-        var t4 = new Thread(() =>
+        var thread6 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -110,12 +109,11 @@ public class CorrectlySynchronized
     // =============== TASKS ==============
     // ====================================
     
-    
     // Should flag ConflictingAccessRule warning
     public void TwoLockedTasks_DifferentLockSymbols()
     {
         // should flag ConflictingAccessThread warning
-        var t1 = new Task(() =>
+        var task1 = new Task(() =>
         {
             lock (_csLock2)
             {
@@ -124,7 +122,7 @@ public class CorrectlySynchronized
         });
         
         // should flag ConflictingAccessThread warning
-        var t2 = new Task(() =>
+        var task2 = new Task(() =>
         {
             lock (_csLock)
             {
@@ -133,17 +131,17 @@ public class CorrectlySynchronized
         });
     } 
     
-    // Should flag a ConflictingAccessRule warning
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedTasks_OneLockSymbols()
     {
         // should flag ConflictingAccessThread warning
-        var t1 = new Task(() =>
+        var task3 = new Task(() =>
         {
             var tmp = GetOtherWork();
         });
         
         // should flag ConflictingAccessThread warning
-        var t2 = new Task(() =>
+        var task4 = new Task(() =>
         {
             lock (_csLock)
             {
@@ -152,10 +150,10 @@ public class CorrectlySynchronized
         });
     }   
     
-    // Should flag 'ConflictingAccessRule' warning
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedTasks_SameLockSymbols()
     {
-        var t3 = new Task(() =>
+        var task5 = new Task(() =>
         {
             lock (_csLock)
             {
@@ -163,7 +161,7 @@ public class CorrectlySynchronized
             }
         });
         
-        var t4 = new Task(() =>
+        var task6 = new Task(() =>
         {
             lock (_csLock)
             {

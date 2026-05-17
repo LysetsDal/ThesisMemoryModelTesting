@@ -28,22 +28,22 @@ namespace ThreadSafetClassAnalyser.Utils
         
         
         /// <summary>
-        /// Determines whether a given <see cref="ISymbol"/> represents a constant or read-only member.
+        /// Determines whether a given <see cref="ISymbol"/> represents a mutable instance/static field or property.
         /// </summary>
-        /// <param name="symbol"> A symbol of type <see cref="IFieldSymbol"/> or <see cref="IPropertySymbol"/>.</param>
+        /// <param name="symbol">The symbol to evaluate.</param>
         /// <returns>
-        /// <see langword="true"/> if the symbol is a read-only or constant field, or a read-only property; 
-        /// otherwise, <see langword="false"/>.
+        /// <see langword="true"/> if the symbol is a writable field (not read-only or constant) 
+        /// or a writable property; otherwise, <see langword="false"/>.
         /// </returns>
-        public static bool IsConstOrReadOnlySymbol(ISymbol symbol)
+        public static bool IsMutableFieldOrProperty(ISymbol symbol)
         {
             if (symbol is IFieldSymbol fieldSymbol)
             {
-                return fieldSymbol.IsReadOnly || fieldSymbol.IsConst;
+                return !fieldSymbol.IsReadOnly && !fieldSymbol.IsConst;
             }
             if (symbol is IPropertySymbol propertySymbol)
             {
-                return propertySymbol.IsReadOnly || propertySymbol.SetMethod == null;
+                return !propertySymbol.IsReadOnly && propertySymbol.SetMethod != null;
             }
             return false;
         }

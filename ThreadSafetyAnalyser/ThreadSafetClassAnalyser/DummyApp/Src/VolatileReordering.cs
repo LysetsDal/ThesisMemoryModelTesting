@@ -1,5 +1,6 @@
 using System.Threading;
 using Annotations;
+// ReSharper disable CheckNamespace
 
 namespace DummyApp.Src;
 
@@ -12,34 +13,35 @@ public class VolatileReordering
     private static int _res1;
     private static int _res2;
 
-    // Should flag VolatileReordering
     private void TestVolatileReordering(int a)
     {
         _y = a;
+        // Should flag VolatileReordering
         var tmp = _x;
         _res2 = tmp;
     }
     
-    // Should not flag volatile reordering on _y. (Flags internal field no lock).
+    // Flags internal field no lock?
     private void TestVolatileReorderingWithMemoryBarrier()
     {
         _x = 2;
         Thread.MemoryBarrier();
+        // Should not flag volatile reordering on _y.
         var tmp = _y;
         _res1 = tmp;
     }
     
-    // should not flag on _x with a lock
     private void TestVolatileReorderingInsideLock()
     {
         lock (Lock)
         {
             _y = 42;
+            // should not flag on _x with a lock
             var tmp = _x;
         }
     }
     
-    // should not flag on _x with a monitor
+    // NOT IMPLEMENTED YET: (should not flag on _x with a monitor)
     private void TestVolatileReorderingSurroundedByMonitor()
     {
         Monitor.Enter(Lock);

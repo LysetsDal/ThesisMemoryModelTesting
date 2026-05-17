@@ -5,9 +5,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
 using System.Linq;
-using ThreadSafetClassAnalyser.Model;
 using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
+// ReSharper disable UnusedType.Global
 
 namespace ThreadSafetClassAnalyser.Analysers
 {
@@ -21,8 +21,7 @@ namespace ThreadSafetClassAnalyser.Analysers
                 EncapsulationRules.FieldDoesNotUseLockRule,
                 EncapsulationRules.InternalFieldNoLockRule,
                 EncapsulationRules.LockObjectExposedRule,
-                EncapsulationRules.InconsistentLockUseRule,
-                EncapsulationRules.TestRuleRule
+                EncapsulationRules.InconsistentLockUseRule
             );
         
         // Internal = The diagnostic message is internally visible inside the class with the field or method.
@@ -37,15 +36,13 @@ namespace ThreadSafetClassAnalyser.Analysers
             context.RegisterSyntaxNodeAction(AnalyzeMemberAccess, SyntaxKind.SimpleMemberAccessExpression);
             
             // [Internal] (PublicFieldExposedRule)
-            // This rule flags public fields internally
+            // This rule flags public fields and public props with public accessor modifiers internally
             context.RegisterSyntaxNodeAction(AnalyzePublicFieldDeclaration, SyntaxKind.FieldDeclaration);
-            
-            // [Internal] (PublicFieldExposedRule) Prop
-            // This rule flags public properties with public accessor modifiers internally.
             context.RegisterSyntaxNodeAction(AnalyzePublicPropertyDeclaration, SyntaxKind.PropertyDeclaration);
             
             // [External] (FieldDoesNotUseLockRule)
-            // This rule flags Methods at the callsite, if they don't use an accessor with a lock.
+            // This rule flags Methods at the callsite, if they don't use an accessor with a lock
+            // or have no call-site locking around the method.
             context.RegisterSyntaxNodeAction(AnalyzeCallingMemberAccessWithLock, SyntaxKind.SimpleMemberAccessExpression);
             
             // [Internal] (InternalFieldNoLockRule) or (InconsistentLockUseRule)
@@ -56,7 +53,6 @@ namespace ThreadSafetClassAnalyser.Analysers
             // [Internal] (LockObjectExposedRule)
             // Finds all locks in a namedType (a class) that are exposed through public accessor.
             context.RegisterSyntaxNodeAction(AnalyzeExposedLocksInFile, SyntaxKind.ClassDeclaration);
-
         }
         
         // -------------------------------------------------------------------------
@@ -64,15 +60,14 @@ namespace ThreadSafetClassAnalyser.Analysers
         // -------------------------------------------------------------------------
         private static void AnalyzeExposedLocksInFile(SyntaxNodeAnalysisContext context)
         {
-            // Use the validator with the SyntaxNode context
-            if (!ThreadSafeValidator.ShouldValidate(context)) return;
-
             var classDecl = (ClassDeclarationSyntax)context.Node;
             var semanticModel = context.SemanticModel; // Safe and efficient
-    
             // Get the symbol for the logical class
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
             if (classSymbol == null) return;
+            
+            // Use the validator with the SyntaxNode context
+            if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
 
             // Use your utility to find lock objects used anywhere in the class
             var lockMap = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
@@ -96,7 +91,7 @@ namespace ThreadSafetClassAnalyser.Analysers
 
                 foreach (var exit in exitPoints)
                 {
-                    ExpressionSyntax expr = exit is ReturnStatementSyntax ret ? ret.Expression : ((ArrowExpressionClauseSyntax)exit).Expression;
+                    var expr = exit is ReturnStatementSyntax ret ? ret.Expression : ((ArrowExpressionClauseSyntax)exit).Expression;
                     if (expr == null) continue;
 
                     // Safe to analyze because expr and semanticModel belong to the same tree
@@ -135,29 +130,18 @@ namespace ThreadSafetClassAnalyser.Analysers
         // -------------------------------------------------------------------------
         private static void AnalyzeMemberAccess(SyntaxNodeAnalysisContext context)
         {
-            // Guard: Only run if annotated with: [ThreadSafe]
-            if (!ThreadSafeValidator.ShouldValidate(context)) return;
-            
             var memberAccess = (MemberAccessExpressionSyntax)context.Node;
             var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
+            if (symbol is null) return;
             
+            // // Guard: Only run if context class is annotated with: [ThreadSafe]
+            if (!ThreadSafeValidator.ShouldValidate(context)) return;
+            
+            // // Guard: Only run if annotated with: [ThreadSafe]
             if (!ThreadSafeValidator.ShouldValidateTarget(symbol)) return;
-            
-            bool isReadonly;
-            if (symbol is IFieldSymbol field)
-            {
-                isReadonly = field.IsReadOnly;
-            }
-            else if (symbol is IPropertySymbol property)
-            {
-                isReadonly = property.SetMethod == null;
-            }
-            else
-            {
-                return;
-            }
 
-            if (isReadonly) return;
+            // Guard: Only care about mutable fields and props (i.e. not readonly or const)
+            if (!SyntaxUtils.IsMutableFieldOrProperty(symbol)) return;
             
             var isInSource = symbol.Locations.FirstOrDefault().IsInSource;
             if (!isInSource) return;
@@ -168,30 +152,18 @@ namespace ThreadSafetClassAnalyser.Analysers
             // Guard: Skip members in Enums
             if (containingType?.TypeKind == TypeKind.Enum) return;
             
+            // Guard: Skip if Field or Prop accessor uses a lock
+            var descendantLock = LockAssociationUtils.FindFirstDescendantLockFromMethodSymbol(symbol);
+            if (descendantLock != null) return;
+            
             // Only warn if accessed from outside the declaring type
             if (accessContainingType != null &&
                 SymbolEqualityComparer.Default.Equals(containingType, accessContainingType))
                 return;
-                
-            var diagnostic = Diagnostic.Create(
-                EncapsulationRules.FieldAccessedExternallyRule,
-                memberAccess.Name.GetLocation(),
-                $"{symbol.Name} is in source: {symbol.Locations[0].IsInSource} is in metadata {symbol.Locations[0].IsInMetadata}",
-                containingType?.Name);
             
-            context.ReportDiagnostic(diagnostic);
-
-            // Optionally, get the declaring syntax for more precise location
-            var syntaxRef = symbol.DeclaringSyntaxReferences.FirstOrDefault();
-            if (syntaxRef == null) return;
-                
-            var syntax = syntaxRef.GetSyntax(context.CancellationToken);
-            var location = syntax.GetLocation();
-
-            // Now report the diagnostic at the precise declaration location
             var declarationDiagnostic = Diagnostic.Create(
                 EncapsulationRules.FieldAccessedExternallyRule,
-                location,
+                memberAccess.Name.GetLocation(),
                 symbol.Name,
                 symbol.ContainingType.Name);
 
@@ -367,10 +339,10 @@ namespace ThreadSafetClassAnalyser.Analysers
         // -------------------------------------------------------------------------
         private static void AnalyzePublicFieldDeclaration(SyntaxNodeAnalysisContext context)
         {
+            var fieldDecl = (FieldDeclarationSyntax)context.Node;
+            
             // Guard Clause: Only run if annotated with: [ThreadSafe]
             if (!ThreadSafeValidator.ShouldValidate(context)) return;
-            
-            var fieldDecl = (FieldDeclarationSyntax)context.Node;
             
             // Rule does not apply to Interfaces, Records or Structs
             if (!SyntaxUtils.IsFieldOrPropParentAClass(context)) return;

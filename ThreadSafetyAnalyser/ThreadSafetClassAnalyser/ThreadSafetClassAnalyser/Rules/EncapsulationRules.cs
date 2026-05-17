@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+// ReSharper disable MemberCanBePrivate.Global
+#pragma warning disable RS2008
 
 namespace ThreadSafetClassAnalyser.Rules
 {
@@ -57,16 +59,6 @@ namespace ThreadSafetClassAnalyser.Rules
                 Category.Encapsulation,
                 DiagnosticSeverity.Warning
             );
-        
-        // --- Test Rule ---
-        public const string TestRuleId = "TestRule";
-        public static readonly DiagnosticDescriptor TestRuleRule =
-            Create(
-                TestRuleId,
-                Category.Encapsulation,
-                DiagnosticSeverity.Warning
-            );
-
         
         private static DiagnosticDescriptor Create(string id, string category, DiagnosticSeverity severity)
         {

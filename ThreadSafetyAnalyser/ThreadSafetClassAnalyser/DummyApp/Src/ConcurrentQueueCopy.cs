@@ -35,7 +35,7 @@ namespace DummyApp.Src;
 
   /// <summary>Represents a thread-safe first in-first out (FIFO) collection.</summary>
   /// <typeparam name="T">The type of the elements contained in the queue.</typeparam>
-  [ThreadSafe]
+  // [ThreadSafe]
   public class ConcurrentQueueCopy<T> : 
     IProducerConsumerCollection<T>,
     IEnumerable<T>,

@@ -6,6 +6,9 @@ using System.Collections.Immutable;
 using System.Linq;
 using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
+// ReSharper disable UnusedType.Global
+// ReSharper disable UseNegatedPatternMatching
+// ReSharper disable ConvertIfStatementToSwitchStatement
 
 namespace ThreadSafetClassAnalyser.Analysers
 {

@@ -13,7 +13,6 @@ namespace ThreadSafetClassAnalyser.Utils
         public const string FullVolatileName = "System.Threading.Volatile";
         public const string FullInterlockedName = "System.Threading.Interlocked";
         
-        
         // Custom Attribute Names
         public const string ThreadSafe = "Annotations.ThreadSafeAttribute";
         public const string ThreadSafeShort = "ThreadSafeAttribute";

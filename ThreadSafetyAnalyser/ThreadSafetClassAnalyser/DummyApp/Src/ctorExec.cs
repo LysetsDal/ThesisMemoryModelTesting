@@ -1,7 +1,21 @@
-﻿using System;
+﻿// ReSharper disable RedundantUsingDirective
+using System;
+using Annotations;
+
+// ReSharper disable VirtualMemberCallInConstructor
+// ReSharper disable FieldCanBeMadeReadOnly.Local
+// ReSharper disable ConvertToConstant.Local
+// ReSharper disable InconsistentNaming
+// ReSharper disable ArrangeTypeMemberModifiers
+// ReSharper disable ArrangeTypeModifiers
+// ReSharper disable MemberCanBeProtected.Global
+// ReSharper disable ConvertConstructorToMemberInitializers
+// ReSharper disable LocalizableElement
+// ReSharper disable CheckNamespace
 
 namespace DummyApp.Src
 {
+    // [ThreadSafe]
     class A
     {
         public A()
@@ -12,6 +26,7 @@ namespace DummyApp.Src
         public virtual void PrintFields() { }
     }
 
+    // [ThreadSafe]
     class B : A
     {
         int hello = 1;

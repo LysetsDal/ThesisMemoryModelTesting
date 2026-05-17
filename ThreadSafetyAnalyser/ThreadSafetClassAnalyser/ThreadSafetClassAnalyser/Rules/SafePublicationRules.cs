@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+// ReSharper disable MemberCanBePrivate.Global
+#pragma warning disable RS2008
 
 namespace ThreadSafetClassAnalyser.Rules
 {
