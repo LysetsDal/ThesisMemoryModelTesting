@@ -9,7 +9,7 @@ using ThreadSafetClassAnalyser.Model;
 using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
 
-namespace ThreadSafetClassAnalyser
+namespace ThreadSafetClassAnalyser.Analysers
 {
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class EncapsulationAnalyser : DiagnosticAnalyzer
@@ -75,8 +75,7 @@ namespace ThreadSafetClassAnalyser
             if (classSymbol == null) return;
 
             // Use your utility to find lock objects used anywhere in the class
-            // Note: GetClassLockAssociationDict should now be careful not to trigger RS1030
-            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+            var lockMap = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
             var allLockSymbols = lockMap.Keys.ToImmutableHashSet(SymbolEqualityComparer.Default);
 
             if (allLockSymbols.IsEmpty) return;
@@ -223,13 +222,13 @@ namespace ThreadSafetClassAnalyser
             if (!(methodSymbol.ContainingSymbol is INamedTypeSymbol)) return;
             
             // Find any locks inside method call
-            var methodDescendantLock = AnalyzerUtils.FindFirstDescendantLockFromMethodSymbol(methodSymbol);
+            var methodDescendantLock = LockAssociationUtils.FindFirstDescendantLockFromMethodSymbol(methodSymbol);
             // Pt 'dumb' only knows if a Method call has a lock somewhere inside before a method, prop or class boundary is hit
             if (methodDescendantLock != null) return;
             
             // Does the current context have an ancestor lock around it?
             var callSiteAncestorLock = 
-                AnalyzerUtils.GetFirstAncestorLockFromSymbol(memberAccess, context.SemanticModel);
+                LockAssociationUtils.GetFirstAncestorLockFromSymbol(memberAccess, context.SemanticModel);
             // If it does it is safe
             if (callSiteAncestorLock != null) return;
             
@@ -258,7 +257,7 @@ namespace ThreadSafetClassAnalyser
         {
             if (!ThreadSafeValidator.ShouldValidate(context)) return;
             
-            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
+            if (!SyntaxUtils.IsFieldOrPropParentAClass(context)) return;
 
             var className = context.ContainingSymbol?.ContainingType;
             var classDecl = context.Node.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
@@ -311,7 +310,7 @@ namespace ThreadSafetClassAnalyser
                     .Select(usage => new 
                     {
                         Usage = usage,
-                        LockSymbol = AnalyzerUtils.GetEnclosingLockSymbol(usage, context.SemanticModel),
+                        LockSymbol = LockAssociationUtils.GetEnclosingLockSymbol(usage, context.SemanticModel),
                         Method = usage.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault(),
                         IsWrite = AnalyzerUtils.IsWriteAccess(usage),
                         IsInsideConstructor = usage.Ancestors().OfType<ConstructorDeclarationSyntax>().Any()
@@ -330,7 +329,7 @@ namespace ThreadSafetClassAnalyser
                 foreach (var info in accessInfos)
                 {
                     var methodSymbol = context.SemanticModel.GetDeclaredSymbol(info.Method);
-                    if (AnalyzerUtils.IsMethodPrivate(methodSymbol))
+                    if (SyntaxUtils.IsMethodPrivate(methodSymbol))
                         continue;
                     
                     // Check if the field is used as an argument to one of the atomic methods
@@ -374,7 +373,7 @@ namespace ThreadSafetClassAnalyser
             var fieldDecl = (FieldDeclarationSyntax)context.Node;
             
             // Rule does not apply to Interfaces, Records or Structs
-            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
+            if (!SyntaxUtils.IsFieldOrPropParentAClass(context)) return;
             
             // Only care about public fields
             if (!fieldDecl.Modifiers.Any(SyntaxKind.PublicKeyword)) return;
@@ -412,7 +411,7 @@ namespace ThreadSafetClassAnalyser
             var propDecl = (PropertyDeclarationSyntax)context.Node;
             
             // Rule does not apply to Interfaces, Records or Structs
-            if (!AnalyzerUtils.IsFieldOrPropParentAClass(context)) return;
+            if (!SyntaxUtils.IsFieldOrPropParentAClass(context)) return;
             
             // Only care about public properties (intersection of private)
             if (propDecl.Modifiers.Any(SyntaxKind.PrivateKeyword)) return;

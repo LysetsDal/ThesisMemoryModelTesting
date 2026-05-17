@@ -32,6 +32,15 @@ namespace ThreadSafetClassAnalyser.Rules
                 Category.CorrectlySynchronized,
                 DiagnosticSeverity.Warning
             );
+
+        public const string ConflictingAccessRuleId = "ConflictingAccessRule";
+
+        public static readonly DiagnosticDescriptor ConflictingAccessRule =
+            Create(
+                ConflictingAccessRuleId,
+                Category.CorrectlySynchronized,
+                DiagnosticSeverity.Warning
+            );
         
         private static DiagnosticDescriptor Create(string id, string category, DiagnosticSeverity severity)
         {

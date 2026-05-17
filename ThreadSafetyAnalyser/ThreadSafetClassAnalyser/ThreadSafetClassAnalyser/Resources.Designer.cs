@@ -296,5 +296,23 @@ namespace ThreadSafetClassAnalyser {
                 return ResourceManager.GetString("LockOnClassInstanceMessageFormat", resourceCulture);
             }
         }
+        
+        internal static string ConflictingAccessRuleTitle {
+            get {
+                return ResourceManager.GetString("ConflictingAccessRuleTitle", resourceCulture);
+            }
+        }
+        
+        internal static string ConflictingAccessRuleDescription {
+            get {
+                return ResourceManager.GetString("ConflictingAccessRuleDescription", resourceCulture);
+            }
+        }
+        
+        internal static string ConflictingAccessRuleMessageFormat {
+            get {
+                return ResourceManager.GetString("ConflictingAccessRuleMessageFormat", resourceCulture);
+            }
+        }
     }
 }

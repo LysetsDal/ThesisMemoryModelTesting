@@ -3,64 +3,35 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
+using ThreadSafetClassAnalyser.Rules;
+using ThreadSafetClassAnalyser.Utils;
 
-namespace ThreadSafetClassAnalyser
+namespace ThreadSafetClassAnalyser.Analysers
 {
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class SafePublicationAnalyzer : DiagnosticAnalyzer
     {
-        private const string Category = "SafePublication";
-
-        // --- Diagnostic: field is not safely published (not readonly/volatile) ---
-        public const string UnsafeFieldDiagnosticId = "SP001";
-        private static readonly AnalyserMetadata UnsafeFieldDiagnosticMetadata =
-            new AnalyserMetadata(UnsafeFieldDiagnosticId);
-        private static readonly DiagnosticDescriptor UnsafeFieldRule = new DiagnosticDescriptor(
-            UnsafeFieldDiagnosticId,
-            UnsafeFieldDiagnosticMetadata.Title,
-            UnsafeFieldDiagnosticMetadata.MessageFormat,
-            category: Category,
-            defaultSeverity: DiagnosticSeverity.Warning,
-            isEnabledByDefault: true,
-            UnsafeFieldDiagnosticMetadata.Description);
-
-
-        // SP002 (DerivedInitializerReadsBase) was removed: the C# compiler already reports
-        // CS0236 ("A field initializer cannot reference the non-static field, method, or
-        // property '<member>'") for exactly this scenario, making SP002 redundant.
-        // See: https://learn.microsoft.com/en-us/dotnet/csharp/misc/cs0236
-
-        // --- Diagnostic: virtual method call in constructor (SP003) ---
-        public const string VirtualCallInCtorDiagnosticId = "SP003";
-        private static readonly AnalyserMetadata VirtualCallInCtorDiagnosticMetadata =
-    new AnalyserMetadata(VirtualCallInCtorDiagnosticId);
-        private static readonly DiagnosticDescriptor VirtualCallInCtorRule = new DiagnosticDescriptor(
-            VirtualCallInCtorDiagnosticId,
-            VirtualCallInCtorDiagnosticMetadata.Title,
-            VirtualCallInCtorDiagnosticMetadata.MessageFormat,
-            category: Category,
-            defaultSeverity: DiagnosticSeverity.Warning,
-            isEnabledByDefault: true,
-            VirtualCallInCtorDiagnosticMetadata.Description);
-
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
-        {
-            [DebuggerStepThrough]
-            get => ImmutableArray.Create(UnsafeFieldRule, VirtualCallInCtorRule);
-        }
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => 
+            ImmutableArray.Create(
+                SafePublicationRules.UnsafeFieldRule, 
+                SafePublicationRules.VirtualCallInCtorRule
+            );
+        
 
         public override void Initialize(AnalysisContext context)
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
             context.EnableConcurrentExecution();
-            // context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
-            // context.RegisterSyntaxNodeAction(AnalyzeConstructorForVirtualCalls, SyntaxKind.ConstructorDeclaration);
+            context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
+            context.RegisterSyntaxNodeAction(AnalyzeConstructorForVirtualCalls, SyntaxKind.ConstructorDeclaration);
         }
 
         private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
         {
+            if (!ThreadSafeValidator.ShouldValidate(context)) 
+                return;
+            
             var classDecl = (ClassDeclarationSyntax)context.Node;
             var semanticModel = context.SemanticModel;
 
@@ -90,7 +61,7 @@ namespace ThreadSafetClassAnalyser
                         continue;
 
                     context.ReportDiagnostic(Diagnostic.Create(
-                        UnsafeFieldRule,
+                        SafePublicationRules.UnsafeFieldRule,
                         variable.GetLocation(),
                         fieldSymbol.Name));
                 }
@@ -99,20 +70,25 @@ namespace ThreadSafetClassAnalyser
 
         private static void AnalyzeConstructorForVirtualCalls(SyntaxNodeAnalysisContext context)
         {
+            if (!ThreadSafeValidator.ShouldValidate(context)) 
+                return;
+            
             var ctorDecl = (ConstructorDeclarationSyntax)context.Node;
             if (ctorDecl.Body == null)
                 return;
-
+            
             var semanticModel = context.SemanticModel;
 
             // Get the class that owns this constructor
             var classDecl = ctorDecl.Parent as ClassDeclarationSyntax;
             if (classDecl == null)
                 return;
+            
 
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl, context.CancellationToken);
             if (classSymbol == null || classSymbol.IsSealed)
                 return; // sealed class: no derived class can override, safe
+            
 
             // Find all invocation expressions in the constructor body
             var invocations = ctorDecl.Body.DescendantNodes().OfType<InvocationExpressionSyntax>();
@@ -132,7 +108,7 @@ namespace ThreadSafetClassAnalyser
                     continue;
 
                 context.ReportDiagnostic(Diagnostic.Create(
-                    VirtualCallInCtorRule,
+                    SafePublicationRules.VirtualCallInCtorRule,
                     invocation.GetLocation(),
                     classSymbol.Name,
                     methodSymbol.Name));

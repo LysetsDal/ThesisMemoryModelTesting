@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Collections.Generic;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -7,8 +8,9 @@ using System.Linq;
 using ThreadSafetClassAnalyser.Model;
 using ThreadSafetClassAnalyser.Rules;
 using ThreadSafetClassAnalyser.Utils;
+// ReSharper disable RedundantAnonymousTypePropertyName
 
-namespace ThreadSafetClassAnalyser
+namespace ThreadSafetClassAnalyser.Analysers
 {
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class CorrectlySynchronizedAnalyzer : DiagnosticAnalyzer
@@ -18,7 +20,8 @@ namespace ThreadSafetClassAnalyser
             ImmutableArray.Create(
                     CorrectlySynchronizedRules.ConflictingAccessThreadRule,
                     CorrectlySynchronizedRules.VolatileReorderingRule,
-                    CorrectlySynchronizedRules.LockOnClassInstanceRule
+                    CorrectlySynchronizedRules.LockOnClassInstanceRule,
+                    CorrectlySynchronizedRules.ConflictingAccessRule
                 );
         
         public override void Initialize(AnalysisContext context)
@@ -43,6 +46,10 @@ namespace ThreadSafetClassAnalyser
             // Flags methods in classes that use 'this' (class instance) as a lock target
             context.RegisterSyntaxNodeAction(AnalyzeLockThis, SyntaxKind.ClassDeclaration);
             
+            // [Internal] (ConflictingAccessRule)
+            // Runs a pair-wise check on all methods and fields. Flags a warning internally, if there is a possibility
+            // of conflicting access on shared mutable class state. Flags all methods 
+            context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesAcrossMembers, SyntaxKind.ClassDeclaration);
         }
         
         // =============================================================
@@ -59,7 +66,7 @@ namespace ThreadSafetClassAnalyser
                 return;
 
             // 2. Use utility to find all locks and their associations
-            var lockMap = AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+            var lockMap = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
 
             foreach (var associations in lockMap.Values)
             {
@@ -91,7 +98,7 @@ namespace ThreadSafetClassAnalyser
                         .FirstOrDefault(a => a is MemberDeclarationSyntax || a is AccessorDeclarationSyntax);
                         
                     var displayMethodName = enclosingMemberNode != null 
-                        ? AnalyzerUtils.GetBodyName(enclosingMemberNode) 
+                        ? SyntaxUtils.GetBodyName(enclosingMemberNode) 
                         : (association.MemberContainingLock?.Name ?? "unknown");
                         
                     context.ReportDiagnostic(Diagnostic.Create(
@@ -125,7 +132,7 @@ namespace ThreadSafetClassAnalyser
 
             foreach (var body in bodies)
             {
-                var methodName = AnalyzerUtils.GetBodyName(body);
+                var methodName = SyntaxUtils.GetBodyName(body);
 
                 // 1. Establish Program Order (PO) within this specific method/lambda body 
                 var identifiers = body.DescendantNodes().OfType<IdentifierNameSyntax>().ToList();
@@ -149,7 +156,7 @@ namespace ThreadSafetClassAnalyser
                             continue;
 
                         // GUARD: Skip if the volatile read is executed inside a lock statement
-                        if (AnalyzerUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null)
+                        if (LockAssociationUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null)
                             continue;
                         
                         // 2. Check for Full Fences (Intervening synchronization) 
@@ -202,8 +209,7 @@ namespace ThreadSafetClassAnalyser
             
             if (threadCreations.Count < 2) return;
             
-            var classLocks =
-                AnalyzerUtils.GetClassLockAssociationDict(classSymbol, semanticModel);
+            var classLocks = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
             
             // Map each thread to the fields it accesses
             var analyzedThreads = threadCreations.Select(tc => 
@@ -215,8 +221,8 @@ namespace ThreadSafetClassAnalyser
                 {
                     Syntax = tc,
                     BodySymbol = bodySymbol,
-                    Name = AnalyzerUtils.GetThreadName(tc),
-                    AccessMap = AnalyzerUtils.GetAccessedFields(tc, semanticModel),
+                    Name = SyntaxUtils.GetThreadName(tc),
+                    AccessMap = AnalyzerUtils.GetAccessedFieldsFromExpression(tc, semanticModel),
                     MethodScope = tc.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault(),
                     UsedLockObjects = AnalyzerUtils.GetLockObjectsUsedInMember(classLocks, bodySymbol)
                 };
@@ -247,7 +253,7 @@ namespace ThreadSafetClassAnalyser
                         var info1 = t1.AccessMap[conflict];
                         var info2 = t2.AccessMap[conflict];
 
-                        if (AnalyzerUtils.IsCorrectlySynchronized(info1, info2)) continue;
+                        if (AnalyzerUtils.IsUsingSameLockObject(info1, info2)) continue;
                         
                         ReportThreadConflict(context, t1, t2, conflict.Name);
                     }
@@ -270,6 +276,105 @@ namespace ThreadSafetClassAnalyser
                 CorrectlySynchronizedRules.ConflictingAccessThreadRule,
                 t2.Syntax.GetLocation(),
                 fieldName, t2.Name, t1.Name));
+        }
+        
+        // =====================================================
+        // ============= CONFLICTING ACCESS TEST ===============
+        // =====================================================
+        private static void AnalyzeConflictingAccessesAcrossMembers(SyntaxNodeAnalysisContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            
+            if (classSymbol == null) return;
+
+            // Guard for the [ThreadSafe] annotation
+            if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
+
+            // 1. Collect all instance methods written in this class (skip static methods)
+            var methodDeclarations = classDecl.Members
+                .OfType<MethodDeclarationSyntax>()
+                .Where(m => !m.Modifiers.Any(SyntaxKind.StaticKeyword))
+                .Where(m => m.GetLocation().IsInSource)
+                .ToList();
+
+            if (methodDeclarations.Count < 2) return;
+
+            // 2. Map out all the class locks
+            var classLocks = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
+
+            // 3. Extract access and lock maps 
+            var analyzedMembers = methodDeclarations.Select(methodDecl =>
+            {
+                var methodSymbol = semanticModel.GetDeclaredSymbol(methodDecl);
+                if (methodSymbol == null) return null;
+
+                return new
+                {
+                    Syntax = methodDecl,
+                    Symbol = methodSymbol,
+                    Name = methodSymbol.Name,
+                    AccessMap = AnalyzerUtils.GetAccessedFieldsFromMethod(methodDecl, semanticModel),
+                    UsedLockObjects = AnalyzerUtils.GetLockObjectsUsedInMember(classLocks, methodSymbol)
+                };
+            }).Where(m => m != null).ToList();
+            
+            var reportedConflicts = new HashSet<(MethodDeclarationSyntax Method, ISymbol Field)>();
+
+            // 4. Pairwise comparison matrix (Compare every method against every other method)
+            for (var i = 0; i < analyzedMembers.Count; i++)
+            {
+                for (var j = i + 1; j < analyzedMembers.Count; j++)
+                {
+                    var m1 = analyzedMembers[i];
+                    var m2 = analyzedMembers[j];
+
+                    // Macro-check: Do the methods share a top-level lock?
+                    if (m1.UsedLockObjects.Intersect(m2.UsedLockObjects, SymbolEqualityComparer.Default).Any())
+                        continue;
+
+                    // Find overlapping field/property accesses
+                    var conflicts = AnalyzerUtils.FindConflicts(m1.AccessMap, m2.AccessMap);
+
+                    foreach (var conflict in conflicts)
+                    {
+                        // If the field itself is inherently readonly, skip
+                        if (SyntaxUtils.IsConstOrReadOnlySymbol(conflict)) continue;
+
+                        // Is this specific field protected by synchronization in the AccessMap?
+                        var info1 = m1.AccessMap[conflict];
+                        var info2 = m2.AccessMap[conflict];
+
+                        if (AnalyzerUtils.IsUsingSameLockObject(info1, info2)) continue;
+                        
+                        // Only flag Method 1 if it hasn't been warned about this specific field yet
+                        if (reportedConflicts.Add((m1.Syntax, conflict)))
+                        {
+                            ReportSingleMemberConflict(context, m1.Syntax, m1.Name, m2.Name, conflict.Name);
+                        }
+                
+                        // Only flag Method 2 if it hasn't been warned about this specific field yet
+                        if (reportedConflicts.Add((m2.Syntax, conflict)))
+                        {
+                            ReportSingleMemberConflict(context, m2.Syntax, m2.Name, m1.Name, conflict.Name);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void ReportSingleMemberConflict(
+            SyntaxNodeAnalysisContext context, 
+            MethodDeclarationSyntax methodSyntax, 
+            string methodName, 
+            string conflictingMethodName, 
+            string fieldName)
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                CorrectlySynchronizedRules.ConflictingAccessRule,
+                methodSyntax.Identifier.GetLocation(),
+                fieldName, methodName, conflictingMethodName));
         }
     }
 }
