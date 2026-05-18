@@ -161,7 +161,9 @@ namespace ThreadSafetClassAnalyser.Analysers
                             continue;
 
                         // GUARD: Skip if the volatile read is executed inside a lock statement
-                        if (LockAssociationUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null)
+                        // OR inside a Monitor.Enter/TryEnter-guarded try block (manual lock pattern)
+                        if (LockAssociationUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null
+                            || AnalyzerUtils.IsInsideMonitorEnterRegion(idRead, semanticModel))
                             continue;
                         
                         // 2. Check for Full Fences (Intervening synchronization) 
