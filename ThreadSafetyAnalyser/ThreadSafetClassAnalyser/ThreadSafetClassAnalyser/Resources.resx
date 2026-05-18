@@ -256,12 +256,12 @@
     <value>The class '{0}' uses 'lock (this)' in method '{1}'. This can cause deadlocks if external code also locks on the instance. Use a private lock object instead</value>
   </data>
   <data name="ConflictingAccessRuleTitle" xml:space="preserve">
-  <value>Conflicting access to shared mutable state across members</value>
+    <value>Conflicting access to shared mutable state across members</value>
   </data>
-    <data name="ConflictingAccessRuleDescription" xml:space="preserve">
+  <data name="ConflictingAccessRuleDescription" xml:space="preserve">
     <value>Multiple class members access the same mutable field concurrently without a shared lock, where at least one operation is a write. This can introduce data races and memory reordering bugs</value>
   </data>
-    <data name="ConflictingAccessRuleMessageFormat" xml:space="preserve">
+  <data name="ConflictingAccessRuleMessageFormat" xml:space="preserve">
     <value>Method '{1}()' can conflict with method '{2}()' on the shared state '{0}' because they lack proper synchronization and at least one method is a write operation.</value>
   </data>
   <data name="MonitorNotPairedTitle" xml:space="preserve">
@@ -292,5 +292,14 @@
   </data>
   <data name="MonitorConflictingAccessDescription" xml:space="preserve">
     <value>A field accessed inside a 'Monitor.Enter'/'Monitor.Exit' critical section is also accessed in another method without equivalent synchronization. This can introduce data races</value>
+  </data>
+  <data name="SP002Title" xml:space="preserve">
+    <value>This reference escapes constructor</value>
+  </data>
+  <data name="SP002Description" xml:space="preserve">
+    <value>This reference escapes during constructor</value>
+  </data>
+  <data name="SP002MessageFormat" xml:space="preserve">
+    <value>The 'this' reference escapes the constructor of class '{0}' via {1} to '{2}'. This may expose uninitialized state to other threads.</value>
   </data>
 </root>

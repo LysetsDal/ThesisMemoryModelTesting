@@ -20,6 +20,11 @@ using DummyApp.Model;
 // ReSharper disable ArrangeDefaultValueWhenTypeNotEvident
 // ReSharper disable RedundantTypeArgumentsOfMethod
 // ReSharper disable RedundantAssignment
+// ReSharper disable FieldCanBeMadeReadOnly.Local
+// ReSharper disable UseCollectionExpression
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedMember.Local
+// ReSharper disable NotAccessedField.Local
 #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 #pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 #pragma warning disable CS8603 // Possible null reference return.
@@ -96,6 +101,7 @@ public class ComplexClass
     private int resSend;
     private int resReceive;
     
+    // Should flag warning ConflictingAccessRule 
     public AuditEvent GetSendClient()
     {
         lock (_lockerSend)
@@ -109,9 +115,11 @@ public class ComplexClass
                 }
             }
         }
+        // Should flag InternalFieldNoLock warning
         return _clientSend;
     }
     
+    // Should flag warning ConflictingAccessRule 
     private AuditEvent GetReceiveClient()
     {
         lock (_lockerReceive)
