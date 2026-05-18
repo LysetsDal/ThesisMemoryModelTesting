@@ -105,6 +105,7 @@ namespace ThreadSafetClassAnalyser {
             }
         }
         
+<<<<<<< HEAD
         /// <summary>
         ///   Looks up a localized string similar to Conflicting access to shared mutable state across members.
         /// </summary>
@@ -543,6 +544,23 @@ namespace ThreadSafetClassAnalyser {
         internal static string VolatileReorderingTitle {
             get {
                 return ResourceManager.GetString("VolatileReorderingTitle", resourceCulture);
+=======
+        internal static string SP002Title {
+            get {
+                return ResourceManager.GetString("SP002Title", resourceCulture);
+            }
+        }
+        
+        internal static string SP002Description {
+            get {
+                return ResourceManager.GetString("SP002Description", resourceCulture);
+            }
+        }
+        
+        internal static string SP002MessageFormat {
+            get {
+                return ResourceManager.GetString("SP002MessageFormat", resourceCulture);
+>>>>>>> RoslynImplementation
             }
         }
     }
