@@ -128,7 +128,7 @@ namespace ThreadSafetClassAnalyser.Utils
             // Now the types match for this call
             PopulateAccessesRecursive(
                 lambda, 
-                model, 
+                model,
                 accessed, 
                 new HashSet<ISymbol>(SymbolEqualityComparer.Default),
                 null);
@@ -139,14 +139,14 @@ namespace ThreadSafetClassAnalyser.Utils
         public static Dictionary<ISymbol, AccessInfo> GetAccessedFieldsFromMethod(MethodDeclarationSyntax methodDecl, SemanticModel model)
         {
             var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
-    
+
             if (methodDecl == null) return accessed;
 
             // Pass the entire method body right into your recursive scanner
             PopulateAccessesRecursive(
-                methodDecl, 
-                model, 
-                accessed, 
+                methodDecl,
+                model,
+                accessed,
                 new HashSet<ISymbol>(SymbolEqualityComparer.Default),
                 null);
 
@@ -175,8 +175,8 @@ namespace ThreadSafetClassAnalyser.Utils
         /// </remarks>
         private static void PopulateAccessesRecursive(
             SyntaxNode node,
-            SemanticModel model, 
-            IDictionary<ISymbol, AccessInfo> accessed, 
+            SemanticModel model,
+            IDictionary<ISymbol, AccessInfo> accessed,
             HashSet<ISymbol> visitedMethods,
             ISymbol currentLockSymbol)
         {

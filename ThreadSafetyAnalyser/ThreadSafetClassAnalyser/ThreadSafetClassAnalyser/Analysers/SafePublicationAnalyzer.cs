@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using ThreadSafetClassAnalyser.Rules;
@@ -162,18 +163,22 @@ namespace ThreadSafetClassAnalyser.Analysers
         private static void AnalyzeConstructorForVirtualCalls(SyntaxNodeAnalysisContext context)
         {
             var ctorDecl = (ConstructorDeclarationSyntax)context.Node;
-            var semanticModel = context.SemanticModel; // Safe and efficient
+            var semanticModel = context.SemanticModel;// Safe and efficient
             var classDecl = ctorDecl.Parent as ClassDeclarationSyntax;
-            // Get the symbol for the logical class
+
+            // Guard: constructor may be inside a record, struct, or other non-class declaration
+            if (classDecl == null) return;
+
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
             if (classSymbol == null) return;
 
-            // Use the validator with the SyntaxNode context
             if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
 
             if (classSymbol == null || classSymbol.IsSealed)
                 return; // sealed class: no derived class can override, safe
-            
+
+            // Guard: constructor may have no body (e.g. extern or expression-bodied)
+            if (ctorDecl.Body == null) return;
 
             // Find all invocation expressions in the constructor body
             var invocations = ctorDecl.Body.DescendantNodes().OfType<InvocationExpressionSyntax>();
