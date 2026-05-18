@@ -15,7 +15,7 @@ using Annotations;
 
 namespace DummyApp.Src
 {
-    // [ThreadSafe]
+    [ThreadSafe]
     class A
     {
         public A()
@@ -26,7 +26,7 @@ namespace DummyApp.Src
         public virtual void PrintFields() { }
     }
 
-    // [ThreadSafe]
+    [ThreadSafe]
     class B : A
     {
         int hello = 1;

@@ -18,7 +18,8 @@ namespace ThreadSafetClassAnalyser.Analysers
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => 
             ImmutableArray.Create(
                 SafePublicationRules.UnsafeFieldRule, 
-                SafePublicationRules.VirtualCallInCtorRule
+                SafePublicationRules.VirtualCallInCtorRule,
+                SafePublicationRules.ThisReferenceEscapeRule
             );
         
 
@@ -28,7 +29,95 @@ namespace ThreadSafetClassAnalyser.Analysers
             context.EnableConcurrentExecution();
             context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
             context.RegisterSyntaxNodeAction(AnalyzeConstructorForVirtualCalls, SyntaxKind.ConstructorDeclaration);
+            
+            context.RegisterSyntaxNodeAction(AnalyzeConstructorForThisEscape, SyntaxKind.ConstructorDeclaration);
         }
+        
+        /// <summary>
+        /// SP1: Implementation to detect if 'this' is published before the constructor completes.
+        /// </summary>
+        private static void AnalyzeConstructorForThisEscape(SyntaxNodeAnalysisContext context)
+        {
+            var ctorDecl = (ConstructorDeclarationSyntax)context.Node;
+            var classDecl = ctorDecl.Parent as ClassDeclarationSyntax;
+            if (classDecl == null) return;
+            
+            if (!ThreadSafeValidator.ShouldValidate(context)) return;
+
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return;
+
+            var thisExpressions = ctorDecl.DescendantNodes().OfType<ThisExpressionSyntax>();
+
+            foreach (var thisExpr in thisExpressions)
+            {
+                // --- Scenario 1: Static Assignment (e.g., _global = this;) ---
+                if (thisExpr.Parent is AssignmentExpressionSyntax assignment && assignment.Right == thisExpr)
+                {
+                    var leftSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                    if (leftSymbol != null && leftSymbol.IsStatic)
+                    {
+                        ReportThisEscape(context, thisExpr, classSymbol.Name, "a static assignment", leftSymbol.Name);
+                        continue; // Found an escape, move to next 'this'
+                    }
+                }
+
+                // --- Scenario 2: Method/Constructor Argument (e.g., SomeMethod(this);) ---
+                // We walk up to find the ArgumentSyntax and then its parent (the call)
+                var argument = thisExpr.Parent as ArgumentSyntax;
+                if (argument?.Parent is ArgumentListSyntax argList)
+                {
+                    var callNode = argList.Parent;
+                    if (callNode != null)
+                    {
+                        var symbol = semanticModel.GetSymbolInfo(callNode).Symbol;
+                        if (symbol is IMethodSymbol method)
+                        {
+                            // If the method belongs to another class or is a constructor, it's an escape
+                            var isExternal = !SymbolEqualityComparer.Default.Equals(method.ContainingType, classSymbol);
+                            var isCtor = method.MethodKind == MethodKind.Constructor;
+
+                            if (isExternal || isCtor)
+                            {
+                                ReportThisEscape(context, thisExpr, classSymbol.Name, "an external call", method.Name);
+                                continue;
+                            }
+                        }
+                    }
+                }
+                
+                // --- Scenario 3: Event Registration (e.g., Global.OnData += this.OnData;) ---
+                if (thisExpr.Parent is MemberAccessExpressionSyntax memberAccess &&
+                    memberAccess.Parent is AssignmentExpressionSyntax eventAssignment &&
+                    eventAssignment.IsKind(SyntaxKind.AddAssignmentExpression))
+                {
+                    var eventSymbol = semanticModel.GetSymbolInfo(eventAssignment.Left).Symbol;
+                    if (eventSymbol is IEventSymbol)
+                    {
+                        ReportThisEscape(context, thisExpr, classSymbol.Name, "an event registration", eventSymbol.Name);
+                    }
+                }
+            }
+        }
+
+        private static void ReportThisEscape(
+            SyntaxNodeAnalysisContext context, 
+            SyntaxNode node, 
+            string className, 
+            string escapeType, 
+            string targetName)
+        {
+            var diagnostic = Diagnostic.Create(
+                SafePublicationRules.ThisReferenceEscapeRule,
+                node.GetLocation(),
+                className,   // {0}
+                escapeType,  // {1}
+                targetName); // {2}
+
+            context.ReportDiagnostic(diagnostic);
+        }
+    
 
         private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
         {

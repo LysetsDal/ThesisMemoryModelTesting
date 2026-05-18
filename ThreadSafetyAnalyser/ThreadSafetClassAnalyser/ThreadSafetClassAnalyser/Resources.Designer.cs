@@ -314,5 +314,23 @@ namespace ThreadSafetClassAnalyser {
                 return ResourceManager.GetString("ConflictingAccessRuleMessageFormat", resourceCulture);
             }
         }
+        
+        internal static string SP002Title {
+            get {
+                return ResourceManager.GetString("SP002Title", resourceCulture);
+            }
+        }
+        
+        internal static string SP002Description {
+            get {
+                return ResourceManager.GetString("SP002Description", resourceCulture);
+            }
+        }
+        
+        internal static string SP002MessageFormat {
+            get {
+                return ResourceManager.GetString("SP002MessageFormat", resourceCulture);
+            }
+        }
     }
 }

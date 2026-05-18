@@ -14,7 +14,14 @@ namespace ThreadSafetClassAnalyser.Rules
                 Category.SafePublication,
                 DiagnosticSeverity.Warning
             );
-
+        
+        public const string ThisReferenceEscapeRuleId = "SP002";
+        public static readonly DiagnosticDescriptor ThisReferenceEscapeRule =
+            Create(
+                ThisReferenceEscapeRuleId,
+                Category.SafePublication,
+                DiagnosticSeverity.Warning
+            );
 
         // SP002 (DerivedInitializerReadsBase) was removed: the C# compiler already reports
         // CS0236 ("A field initializer cannot reference the non-static field, method, or
