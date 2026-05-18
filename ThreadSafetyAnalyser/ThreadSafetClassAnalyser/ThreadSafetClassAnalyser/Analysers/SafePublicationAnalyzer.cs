@@ -29,7 +29,6 @@ namespace ThreadSafetClassAnalyser.Analysers
             context.EnableConcurrentExecution();
             context.RegisterSyntaxNodeAction(AnalyzeClassDeclaration, SyntaxKind.ClassDeclaration);
             context.RegisterSyntaxNodeAction(AnalyzeConstructorForVirtualCalls, SyntaxKind.ConstructorDeclaration);
-            
             context.RegisterSyntaxNodeAction(AnalyzeConstructorForThisEscape, SyntaxKind.ConstructorDeclaration);
         }
         
