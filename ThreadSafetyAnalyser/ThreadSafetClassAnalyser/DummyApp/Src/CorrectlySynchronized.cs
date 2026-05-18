@@ -28,7 +28,7 @@ public class CorrectlySynchronized
         _otherWork = otherWork;
     }
     
-    // Should flag ConflictingAccessRule warning
+    //Should flag ConflictingAccessRule warning
     public void BadLockingOnClassInstance()
     {
         // Should flag LockOnClassInstance warning
@@ -38,7 +38,7 @@ public class CorrectlySynchronized
             SetOtherWork(tmp + 1);
         }
     }
-
+    
     // ====================================
     // ============== Threads =============
     // ====================================

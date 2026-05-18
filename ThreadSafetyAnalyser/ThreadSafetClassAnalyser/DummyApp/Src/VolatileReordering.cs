@@ -4,7 +4,7 @@ using Annotations;
 
 namespace DummyApp.Src;
 
-[ThreadSafe]
+// [ThreadSafe]
 public class VolatileReordering
 {
     private static readonly object Lock = new ();

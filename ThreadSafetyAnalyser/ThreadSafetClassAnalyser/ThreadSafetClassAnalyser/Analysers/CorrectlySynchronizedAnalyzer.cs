@@ -109,8 +109,6 @@ namespace ThreadSafetClassAnalyser.Analysers
             }
         }
         
-        
-        
         // =============================================================
         // ========= POSSIBLE VOLATILE STORE LOAD REORDERING ===========
         // =============================================================
@@ -314,7 +312,7 @@ namespace ThreadSafetClassAnalyser.Analysers
                     Symbol = methodSymbol,
                     Name = methodSymbol.Name,
                     AccessMap = AnalyzerUtils.GetAccessedFieldsFromMethod(methodDecl, semanticModel),
-                    UsedLockObjects = AnalyzerUtils.GetLockObjectsUsedInMember(classLocks, methodSymbol)
+                    UsedLockObjects = AnalyzerUtils.GetLockObjectsUsedInMember(classLocks, methodSymbol).ToList()
                 };
             }).Where(m => m != null).ToList();
             
@@ -330,8 +328,8 @@ namespace ThreadSafetClassAnalyser.Analysers
                     var m2 = analyzedMembers[j];
 
                     // Macro-check: Do the methods share a top-level lock?
-                    if (m1.UsedLockObjects.Intersect(m2.UsedLockObjects, SymbolEqualityComparer.Default).Any())
-                        continue;
+                    // if (m1.UsedLockObjects.Intersect(m2.UsedLockObjects, SymbolEqualityComparer.Default).Any())
+                    //     continue;
 
                     // Find overlapping field/property accesses
                     var conflicts = AnalyzerUtils.FindConflicts(m1.AccessMap, m2.AccessMap);

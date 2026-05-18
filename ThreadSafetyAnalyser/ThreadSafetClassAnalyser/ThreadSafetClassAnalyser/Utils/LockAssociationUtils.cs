@@ -39,7 +39,7 @@ namespace ThreadSafetClassAnalyser.Utils
                     ISymbol lockObjSymbol;
                     try
                     {
-                        lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
+                        lockObjSymbol = GetLockSymbol(lockStmt.Expression, semanticModel);;
                     }
                     catch (ArgumentException ex)
                     {
@@ -129,14 +129,24 @@ namespace ThreadSafetClassAnalyser.Utils
             
             return lockStmt == null ? null :
                 // Get the symbol of what is being locked (e.g., _syncObj)
-                model.GetSymbolInfo(lockStmt.Expression).Symbol;
+                GetLockSymbol(lockStmt.Expression, model);;
         }
         
         public static ISymbol GetEnclosingLockSymbol(SyntaxNode node, SemanticModel model)
         {
             var lockStatement = node.Ancestors().OfType<LockStatementSyntax>().FirstOrDefault();
-            return lockStatement == null ? null : model.GetSymbolInfo(lockStatement.Expression).Symbol;
+            return lockStatement == null ? null : GetLockSymbol(lockStatement.Expression, model);
         }
         
+        private static ISymbol GetLockSymbol(ExpressionSyntax expression, SemanticModel model)
+        {
+            if (expression is ThisExpressionSyntax)
+            {
+                // For 'lock(this)', use the class's type symbol as the unique lock identifier
+                return model.GetTypeInfo(expression).Type;
+            }
+    
+            return model.GetSymbolInfo(expression).Symbol;
+        }
     }
 }
