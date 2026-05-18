@@ -6,7 +6,7 @@ using Annotations;
 
 namespace DummyApp.Src;
 
-// [ThreadSafe]
+[ThreadSafe]
 public class CorrectlySynchronized
 {
     private int Count { get; set; } = 0;
@@ -19,13 +19,19 @@ public class CorrectlySynchronized
     // Should flag ConflictingAccessRule warning
     public int GetOtherWork()
     {
-        return _otherWork;
+        lock (this)
+        {
+            return _otherWork;
+        }
     }    
     
     // Should flag ConflictingAccessRule warning
     public void SetOtherWork(int otherWork)
     {
-        _otherWork = otherWork;
+        lock (this)
+        {
+            _otherWork = otherWork;
+        }
     }
     
     // Should flag ConflictingAccessRule warning

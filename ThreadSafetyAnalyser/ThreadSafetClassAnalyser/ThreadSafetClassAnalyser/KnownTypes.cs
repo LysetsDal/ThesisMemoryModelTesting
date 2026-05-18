@@ -12,6 +12,7 @@ namespace ThreadSafetClassAnalyser.Utils
         public const string FullThreadName = "System.Threading.Thread";
         public const string FullVolatileName = "System.Threading.Volatile";
         public const string FullInterlockedName = "System.Threading.Interlocked";
+        public const string FullMonitorName = "System.Threading.Monitor";
         
         // Custom Attribute Names
         public const string ThreadSafe = "Annotations.ThreadSafeAttribute";

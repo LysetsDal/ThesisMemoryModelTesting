@@ -264,4 +264,33 @@
     <data name="ConflictingAccessRuleMessageFormat" xml:space="preserve">
     <value>Method '{1}()' can conflict with method '{2}()' on the shared state '{0}' because they lack proper synchronization and at least one method is a write operation.</value>
   </data>
+  <data name="MonitorNotPairedTitle" xml:space="preserve">
+    <value>Unpaired Monitor.Enter call</value>
+  </data>
+  <data name="MonitorNotPairedMessageFormat" xml:space="preserve">
+    <value>Method '{0}' calls 'Monitor.Enter' on '{1}' but has no matching 'Monitor.Exit' call. This will cause the lock to never be released</value>
+  </data>
+  <data name="MonitorNotPairedDescription" xml:space="preserve">
+    <value>Every 'Monitor.Enter' call must be matched by a 'Monitor.Exit' call. An unpaired enter will permanently hold the lock, causing deadlocks for all other threads trying to acquire it</value>
+  </data>
+
+  <data name="MonitorNotInFinallyTitle" xml:space="preserve">
+    <value>Monitor.Enter not protected by try/finally</value>
+  </data>
+  <data name="MonitorNotInFinallyMessageFormat" xml:space="preserve">
+    <value>Method '{0}' calls 'Monitor.Enter' on '{1}' without a try/finally block. An exception will prevent 'Monitor.Exit' from running and leave the lock permanently acquired</value>
+  </data>
+  <data name="MonitorNotInFinallyDescription" xml:space="preserve">
+    <value>'Monitor.Enter' must be followed immediately by a try block with 'Monitor.Exit' in the finally clause. Without this pattern, any exception thrown inside the critical section will permanently hold the lock</value>
+  </data>
+
+  <data name="MonitorConflictingAccessTitle" xml:space="preserve">
+    <value>Conflicting access to shared state inside Monitor-guarded region</value>
+  </data>
+  <data name="MonitorConflictingAccessMessageFormat" xml:space="preserve">
+    <value>Method '{1}()' accesses shared field '{0}' inside a 'Monitor' critical section, but method '{2}()' accesses the same field without equivalent synchronization</value>
+  </data>
+  <data name="MonitorConflictingAccessDescription" xml:space="preserve">
+    <value>A field accessed inside a 'Monitor.Enter'/'Monitor.Exit' critical section is also accessed in another method without equivalent synchronization. This can introduce data races</value>
+  </data>
 </root>

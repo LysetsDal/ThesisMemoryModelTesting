@@ -354,14 +354,31 @@ namespace ThreadSafetClassAnalyser.Utils
                     if (symbol != null)
                     {
                         var containingType = symbol.ContainingType.ToDisplayString();
-                        // Barriers: Thread.MemoryBarrier, Interlocked operations, or entering a lock
-                        if (containingType == KnownTypes.FullThreadName && symbol.Name == KnownTypes.MemoryBarrier) return true;
-                        if (containingType == KnownTypes.FullInterlockedName) return true;
+                        var methodName = symbol.Name;
+
+                        // Thread.MemoryBarrier() — explicit full fence
+                        if (containingType == KnownTypes.FullThreadName && methodName == KnownTypes.MemoryBarrier)
+                            return true;
+
+                        // Interlocked.* — no read or write can move past an interlocked operation in either direction
+                        // Covers: Exchange, CompareExchange, Add, Increment, Decrement, Read, Or, And
+                        // https://learn.microsoft.com/en-us/archive/msdn-magazine/2005/october/understanding-low-lock-techniques-in-multithreaded-apps
+                        if (containingType == KnownTypes.FullInterlockedName)
+                            return true;
+
+                        // Monitor.Enter / Monitor.TryEnter — acquire fence
+                        // Monitor.Exit — release fence
+                        // Together (or individually between a write and read) they act as a full fence
+                        if (containingType == KnownTypes.FullMonitorName &&
+                            (methodName == "Enter" || methodName == "Exit" || methodName == "TryEnter"))
+                            return true;
                     }
                 }
 
-                // Check for lock statements (Full fence on entry/exit)
-                if (node is LockStatementSyntax) return true;
+                // lock statement — full fence on both entry (acquire) and exit (release)
+                // Syntactic sugar over Monitor.Enter / Monitor.Exit
+                if (node is LockStatementSyntax)
+                    return true;
             }
 
             return false;
