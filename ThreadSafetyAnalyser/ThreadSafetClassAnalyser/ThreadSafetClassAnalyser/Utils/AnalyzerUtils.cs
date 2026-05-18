@@ -228,17 +228,32 @@ namespace ThreadSafetClassAnalyser.Utils
         /// This method walks up the syntax tree to resolve complex member or element accesses 
         /// (e.g., tracing <c>obj.NestedProperty.Field</c> up to its assignment context) before 
         /// checking for mutating expressions like <c>=</c>, <c>+=</c>, <c>++</c>, or <c>--</c>.
+        /// Note: if the identifier resolves to an element access (e.g. <c>arr[i] = val</c>) or a
+        /// parenthesized expression on the left-hand side, it is treated as a read — only the element
+        /// is written, not the field itself.
         /// </remarks>
         public static bool IsWriteAccess(IdentifierNameSyntax identifier)
         {
             SyntaxNode current = identifier;
 
-            // Walk up through member accesses (obj.Field) or element accesses (arr[i])
-            // to find the full expression being assigned to.
+            // Walk up through member accesses (obj.Field) to find the full expression being assigned to.
             while (current.Parent is MemberAccessExpressionSyntax || current.Parent is ElementAccessExpressionSyntax)
             {
+                // If the identifier is inside bracket arguments (e.g. arr[field]) or a parenthesized
+                // expression, the field is only being read — not written.
+                if (current.Parent is ElementAccessExpressionSyntax elementAccess && elementAccess.Expression != current)
+                    return false;
+
+                if (current.Parent is ParenthesizedExpressionSyntax)
+                    return false;
+
                 current = current.Parent;
             }
+
+            // If the walked-up expression is itself an element access (e.g. _array[i] = val),
+            // the field is only read to obtain the collection reference — not written.
+            if (current is ElementAccessExpressionSyntax)
+                return false;
 
             var parent = current.Parent;
 
@@ -354,14 +369,31 @@ namespace ThreadSafetClassAnalyser.Utils
                     if (symbol != null)
                     {
                         var containingType = symbol.ContainingType.ToDisplayString();
-                        // Barriers: Thread.MemoryBarrier, Interlocked operations, or entering a lock
-                        if (containingType == KnownTypes.FullThreadName && symbol.Name == KnownTypes.MemoryBarrier) return true;
-                        if (containingType == KnownTypes.FullInterlockedName) return true;
+                        var methodName = symbol.Name;
+
+                        // Thread.MemoryBarrier() — explicit full fence
+                        if (containingType == KnownTypes.FullThreadName && methodName == KnownTypes.MemoryBarrier)
+                            return true;
+
+                        // Interlocked.* — no read or write can move past an interlocked operation in either direction
+                        // Covers: Exchange, CompareExchange, Add, Increment, Decrement, Read, Or, And
+                        // https://learn.microsoft.com/en-us/archive/msdn-magazine/2005/october/understanding-low-lock-techniques-in-multithreaded-apps
+                        if (containingType == KnownTypes.FullInterlockedName)
+                            return true;
+
+                        // Monitor.Enter / Monitor.TryEnter — acquire fence
+                        // Monitor.Exit — release fence
+                        // Together (or individually between a write and read) they act as a full fence
+                        if (containingType == KnownTypes.FullMonitorName &&
+                            (methodName == "Enter" || methodName == "Exit" || methodName == "TryEnter"))
+                            return true;
                     }
                 }
 
-                // Check for lock statements (Full fence on entry/exit)
-                if (node is LockStatementSyntax) return true;
+                // lock statement — full fence on both entry (acquire) and exit (release)
+                // Syntactic sugar over Monitor.Enter / Monitor.Exit
+                if (node is LockStatementSyntax)
+                    return true;
             }
 
             return false;
@@ -384,6 +416,64 @@ namespace ThreadSafetClassAnalyser.Utils
             return info1.LockObject != null && 
                    info2.LockObject != null && 
                    SymbolEqualityComparer.Default.Equals(info1.LockObject, info2.LockObject);
+        }
+        
+        /// <summary>
+        /// Returns <see langword="true"/> if <paramref name="node"/> is protected by the
+        /// <c>Monitor.Enter</c> / <c>Monitor.Exit</c> manual-lock pattern — i.e. a
+        /// <c>Monitor.Enter</c> call precedes it in the method body, and it is enclosed
+        /// in a try/finally whose finally block calls <c>Monitor.Exit</c>.
+        /// </summary>
+        public static bool IsInsideMonitorEnterRegion(SyntaxNode node, SemanticModel model)
+        {
+            var nodePos = node.SpanStart;
+
+            // 1. The node must be enclosed in a try/finally where the finally releases the lock
+            var coveringTry = node.Ancestors()
+                .OfType<TryStatementSyntax>()
+                .FirstOrDefault(t => t.Finally != null && HasMonitorExitInFinally(t.Finally, model));
+
+            if (coveringTry == null) return false;
+
+            // 2. A Monitor.Enter/TryEnter call must appear before this node in the method body
+            var methodBody = node.Ancestors()
+                .Select(a =>
+                {
+                    if (a is MethodDeclarationSyntax m)
+                        return m.Body as SyntaxNode;
+                    if (a is AnonymousFunctionExpressionSyntax f)
+                        return f.Body;
+                    return null;
+                })
+                .FirstOrDefault(b => b != null);
+
+            if (methodBody == null) return false;
+
+            return methodBody.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv =>
+                {
+                    if (inv.SpanStart >= nodePos) return false;
+                    var symbol = model.GetSymbolInfo(inv).Symbol as IMethodSymbol;
+                    return symbol?.ContainingType.ToDisplayString() == KnownTypes.FullMonitorName &&
+                           (symbol.Name == "Enter" || symbol.Name == "TryEnter");
+                });
+        }
+
+        /// <summary>
+        /// Returns <see langword="true"/> if the given finally clause contains a
+        /// <c>Monitor.Exit</c> call — indicating a manually managed lock release.
+        /// </summary>
+        private static bool HasMonitorExitInFinally(FinallyClauseSyntax finallyClause, SemanticModel model)
+        {
+            return finallyClause.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv =>
+                {
+                    var symbol = model.GetSymbolInfo(inv).Symbol as IMethodSymbol;
+                    return symbol?.ContainingType.ToDisplayString() == KnownTypes.FullMonitorName &&
+                           symbol.Name == "Exit";
+                });
         }
     }
 }

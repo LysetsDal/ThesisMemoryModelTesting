@@ -22,7 +22,10 @@ namespace ThreadSafetClassAnalyser.Analysers
                 CorrectlySynchronizedRules.ConflictingAccessThreadRule,
                 CorrectlySynchronizedRules.VolatileReorderingRule,
                 CorrectlySynchronizedRules.LockOnClassInstanceRule,
-                CorrectlySynchronizedRules.ConflictingAccessRule
+                CorrectlySynchronizedRules.ConflictingAccessRule,
+                CorrectlySynchronizedRules.MonitorNotPairedRule,
+                CorrectlySynchronizedRules.MonitorNotInFinallyRule,
+                CorrectlySynchronizedRules.MonitorConflictingAccessRule
             );
         
         public override void Initialize(AnalysisContext context)
@@ -48,6 +51,10 @@ namespace ThreadSafetClassAnalyser.Analysers
             // Runs a pair-wise check on all methods and fields. Flags a warning internally, if there is a possibility
             // of conflicting access on shared mutable class state. Flags all methods 
             context.RegisterSyntaxNodeAction(AnalyzeConflictingAccessesAcrossMembers, SyntaxKind.ClassDeclaration);
+
+            // [Internal] (MonitorNotPairedRule / MonitorNotInFinallyRule / MonitorConflictingAccessRule)
+            // Flags incorrect or unsafe usage of Monitor.Enter / Monitor.Exit
+            context.RegisterSyntaxNodeAction(AnalyzeMonitorUsage, SyntaxKind.ClassDeclaration);
         }
         
         // =============================================================
@@ -152,7 +159,9 @@ namespace ThreadSafetClassAnalyser.Analysers
                             continue;
 
                         // GUARD: Skip if the volatile read is executed inside a lock statement
-                        if (LockAssociationUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null)
+                        // OR inside a Monitor.Enter/TryEnter-guarded try block (manual lock pattern)
+                        if (LockAssociationUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null
+                            || AnalyzerUtils.IsInsideMonitorEnterRegion(idRead, semanticModel))
                             continue;
                         
                         // 2. Check for Full Fences (Intervening synchronization) 
@@ -371,6 +380,112 @@ namespace ThreadSafetClassAnalyser.Analysers
                 CorrectlySynchronizedRules.ConflictingAccessRule,
                 methodSyntax.Identifier.GetLocation(),
                 fieldName, methodName, conflictingMethodName));
+        }
+
+        // =============================================================
+        // ============== MONITOR ENTER / EXIT USAGE ===================
+        // =============================================================
+        private static void AnalyzeMonitorUsage(SyntaxNodeAnalysisContext context)
+        {
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel;
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+
+            // Guard: Only run if the class is annotated with [ThreadSafe]
+            if (classSymbol == null || !ThreadSafeValidator.ShouldValidateTarget(classSymbol))
+                return;
+
+            // Scan every non-static instance method in the class
+            var methodDeclarations = classDecl.Members
+                .OfType<MethodDeclarationSyntax>()
+                .Where(m => !m.Modifiers.Any(SyntaxKind.StaticKeyword))
+                .Where(m => m.GetLocation().IsInSource);
+
+            foreach (var methodDecl in methodDeclarations)
+            {
+                var methodName = semanticModel.GetDeclaredSymbol(methodDecl)?.Name ?? "unknown";
+
+                // Collect all invocations in this method that target System.Threading.Monitor
+                var invocations = methodDecl.DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Where(inv =>
+                    {
+                        var sym = semanticModel.GetSymbolInfo(inv).Symbol as IMethodSymbol;
+                        return sym?.ContainingType?.ToDisplayString() == KnownTypes.FullMonitorName;
+                    })
+                    .ToList();
+
+                // --- Collect Enter and Exit call sites ---
+                var enterCalls = invocations
+                    .Where(inv => (semanticModel.GetSymbolInfo(inv).Symbol as IMethodSymbol)?.Name
+                                  is "Enter" ||
+                                  (semanticModel.GetSymbolInfo(inv).Symbol as IMethodSymbol)?.Name
+                                  is "TryEnter")
+                    .ToList();
+
+                var exitCalls = invocations
+                    .Where(inv => (semanticModel.GetSymbolInfo(inv).Symbol as IMethodSymbol)?.Name == "Exit")
+                    .ToList();
+
+                foreach (var enterCall in enterCalls)
+                {
+                    // GUARD: Monitor.Enter(obj, ref lockTaken) is the intentional cross-method pairing
+                    // pattern. Enter and Exit will be in different methods by design — skip lifetime checks.
+                    var isManualLifetimePattern = enterCall.ArgumentList.Arguments.Count >= 2;
+                    if (isManualLifetimePattern) continue;
+
+                    // Resolve the lock-object argument symbol (first argument of Monitor.Enter)
+                    var lockArgExpr = enterCall.ArgumentList.Arguments.FirstOrDefault()?.Expression;
+                    var lockObjSymbol = lockArgExpr != null
+                        ? semanticModel.GetSymbolInfo(lockArgExpr).Symbol
+                        : null;
+
+                    var lockObjName = lockObjSymbol?.Name ?? lockArgExpr?.ToString() ?? "unknown";
+
+                    // --- Rule: MonitorNotPaired ---
+                    // Check there is at least one Exit call for the same lock object in this method
+                    var hasMatchingExit = exitCalls.Any(exit =>
+                    {
+                        var exitArgExpr = exit.ArgumentList.Arguments.FirstOrDefault()?.Expression;
+                        var exitObjSymbol = exitArgExpr != null
+                            ? semanticModel.GetSymbolInfo(exitArgExpr).Symbol
+                            : null;
+                        return SymbolEqualityComparer.Default.Equals(lockObjSymbol, exitObjSymbol);
+                    });
+
+                    if (!hasMatchingExit)
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            CorrectlySynchronizedRules.MonitorNotPairedRule,
+                            enterCall.GetLocation(),
+                            methodName,     // {0}
+                            lockObjName));  // {1}
+                    }
+
+                    // --- Rule: MonitorNotInFinally ---
+                    // Check that the Enter call is inside a try/finally block
+                    var enclosingTry = enterCall.Ancestors().OfType<TryStatementSyntax>().FirstOrDefault();
+                    var hasFinally = enclosingTry?.Finally != null;
+
+                    if (!hasFinally)
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            CorrectlySynchronizedRules.MonitorNotInFinallyRule,
+                            enterCall.GetLocation(),
+                            methodName,     // {0}
+                            lockObjName));  // {1}
+                    }
+
+                    // --- Rule: MonitorConflictingAccess ---
+                    // Bare-bones placeholder until access-map comparison is wired up
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        CorrectlySynchronizedRules.MonitorConflictingAccessRule,
+                        enterCall.GetLocation(),
+                        lockObjName,    // {0}
+                        methodName,     // {1}
+                        "?"));          // {2} — conflicting method, TBD in next iteration
+                }
+            }
         }
     }
 }

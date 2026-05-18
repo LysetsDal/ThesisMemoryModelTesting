@@ -120,15 +120,15 @@ namespace ThreadSafetClassAnalyser.Analysers
 
         private static void AnalyzeClassDeclaration(SyntaxNodeAnalysisContext context)
         {
-            if (!ThreadSafeValidator.ShouldValidate(context)) 
-                return;
-            
-            var classDecl = (ClassDeclarationSyntax)context.Node;
-            var semanticModel = context.SemanticModel;
 
-            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl, context.CancellationToken);
-            if (classSymbol == null)
-                return;
+            var classDecl = (ClassDeclarationSyntax)context.Node;
+            var semanticModel = context.SemanticModel; // Safe and efficient
+            // Get the symbol for the logical class
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return;
+
+            // Use the validator with the SyntaxNode context
+            if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
 
             // --- SP001: Check all instance fields for safe publication ---
             foreach (var fieldDecl in classDecl.Members.OfType<FieldDeclarationSyntax>())
@@ -161,22 +161,16 @@ namespace ThreadSafetClassAnalyser.Analysers
 
         private static void AnalyzeConstructorForVirtualCalls(SyntaxNodeAnalysisContext context)
         {
-            if (!ThreadSafeValidator.ShouldValidate(context)) 
-                return;
-            
             var ctorDecl = (ConstructorDeclarationSyntax)context.Node;
-            if (ctorDecl.Body == null)
-                return;
-            
-            var semanticModel = context.SemanticModel;
-
-            // Get the class that owns this constructor
+            var semanticModel = context.SemanticModel; // Safe and efficient
             var classDecl = ctorDecl.Parent as ClassDeclarationSyntax;
-            if (classDecl == null)
-                return;
-            
+            // Get the symbol for the logical class
+            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return;
 
-            var classSymbol = semanticModel.GetDeclaredSymbol(classDecl, context.CancellationToken);
+            // Use the validator with the SyntaxNode context
+            if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
+
             if (classSymbol == null || classSymbol.IsSealed)
                 return; // sealed class: no derived class can override, safe
             
