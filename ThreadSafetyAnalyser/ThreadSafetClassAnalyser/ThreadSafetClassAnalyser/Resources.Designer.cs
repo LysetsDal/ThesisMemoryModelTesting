@@ -105,7 +105,6 @@ namespace ThreadSafetClassAnalyser {
             }
         }
         
-<<<<<<< HEAD
         /// <summary>
         ///   Looks up a localized string similar to Conflicting access to shared mutable state across members.
         /// </summary>
@@ -542,9 +541,12 @@ namespace ThreadSafetClassAnalyser {
         ///   Looks up a localized string similar to Possible volatile store/load reordering.
         /// </summary>
         internal static string VolatileReorderingTitle {
-            get {
+            get
+            {
                 return ResourceManager.GetString("VolatileReorderingTitle", resourceCulture);
-=======
+            }
+        }
+
         internal static string SP002Title {
             get {
                 return ResourceManager.GetString("SP002Title", resourceCulture);
@@ -560,7 +562,6 @@ namespace ThreadSafetClassAnalyser {
         internal static string SP002MessageFormat {
             get {
                 return ResourceManager.GetString("SP002MessageFormat", resourceCulture);
->>>>>>> RoslynImplementation
             }
         }
     }
