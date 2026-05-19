@@ -2,7 +2,24 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using Annotations;
-
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using System.Threading;
+// ReSharper disable ConvertIfStatementToNullCoalescingAssignment
+// ReSharper disable BadControlBracesIndent
+// ReSharper disable TooWideLocalVariableScope
+// ReSharper disable MergeConditionalExpression
+// ReSharper disable ConvertToPrimaryConstructor
+// ReSharper disable ClassNeverInstantiated.Global
+// ReSharper disable MemberCanBeMadeStatic.Global
+// ReSharper disable RedundantTypeArgumentsOfMethod
+// ReSharper disable UnusedMemberInSuper.Global
+// ReSharper disable ReturnTypeCanBeNotNullable
+// ReSharper disable PossibleMultipleEnumeration
+// ReSharper disable RedundantBaseConstructorCall
 // ReSharper disable ArrangeStaticMemberQualifier
 // ReSharper disable RedundantNameQualifier
 // ReSharper disable PossibleUnintendedReferenceComparison
@@ -17,32 +34,6 @@ using Annotations;
 // ReSharper disable RedundantNullableDirective
 // ReSharper disable NotResolvedInText
 // ReSharper disable UnusedTypeParameter
-#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-#pragma warning disable CS8604 // Possible null reference argument.
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-
-namespace BCL_Basline.Collections;
-
-// Decompiled with JetBrains decompiler
-// Type: System.Collections.Concurrent.ConcurrentDictionary`2
-// Assembly: System.Collections.Concurrent, Version=8.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a
-// MVID: 34BD86B0-DEC9-449C-AF31-862E0862CD56
-// Assembly location: /usr/local/share/dotnet/shared/Microsoft.NETCore.App/8.0.20/System.Collections.Concurrent.dll
-// XML documentation location: /usr/local/share/dotnet/packs/Microsoft.NETCore.App.Ref/8.0.3/ref/net8.0/System.Collections.Concurrent.xml
-
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Threading;
-// ReSharper disable RedundantTypeArgumentsOfMethod
-// ReSharper disable UnusedMemberInSuper.Global
-// ReSharper disable ReturnTypeCanBeNotNullable
-// ReSharper disable PossibleMultipleEnumeration
-// ReSharper disable RedundantBaseConstructorCall
-
 // ReSharper disable ClassWithVirtualMembersNeverInherited.Global
 // ReSharper disable InconsistentNaming
 // ReSharper disable RedundantExtendsListEntry
@@ -68,6 +59,19 @@ using System.Threading;
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable RedundantCast
+#pragma warning disable CS8632 // The annotation for nullable reference types should only be used in code within a '#nullable' annotations context.
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+#pragma warning disable CS8604 // Possible null reference argument.
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+
+// %%%% THESIS METADATA %%%%
+// Top-level fields:     19
+// Props:                12
+// Methods:              44
+// LOC:                 617 (includes nested class)
+// %%%%%%%%%%%%%%%%%%%%%%%%%
+
+namespace BCL_Basline.Collections;
 
 #nullable enable
 
@@ -76,7 +80,7 @@ using System.Threading;
 /// <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
 [DebuggerTypeProxy(typeof (IDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-[ThreadSafe]
+// [ThreadSafe]
 public class ConcurrentDictionary<TKey, TValue> : 
   IDictionary<TKey, TValue>,
   ICollection<KeyValuePair<TKey, TValue>>,
@@ -225,7 +229,7 @@ public class ConcurrentDictionary<TKey, TValue> :
       if (comparer == EqualityComparer<TKey>.Default)
         this._comparerIsDefaultForClasses = true;
     }
-label_19:
+  label_19:
     this._tables = new ConcurrentDictionary<TKey, TValue>.Tables(buckets, locks, countPerLock, comparer);
     this._growLockArray = growLockArray;
     this._budget = buckets.Length / locks.Length;
