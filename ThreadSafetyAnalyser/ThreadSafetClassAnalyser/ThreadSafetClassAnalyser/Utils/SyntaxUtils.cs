@@ -56,6 +56,39 @@ namespace ThreadSafetClassAnalyser.Utils
             return method.DeclaredAccessibility != Accessibility.Public;
         }
         
+        public static bool IsExclusivelyConstructorCalled(IMethodSymbol methodSymbol, SemanticModel semanticModel, ClassDeclarationSyntax classDecl)
+        {
+            // 1. Only private/internal methods should be candidates for this optimization
+            if (methodSymbol.DeclaredAccessibility != Accessibility.Private && 
+                methodSymbol.DeclaredAccessibility != Accessibility.Internal)
+            {
+                return false;
+            }
+
+            // 2. Find all invocations of this method within the class
+            var invocations = classDecl.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(inv => SymbolEqualityComparer.Default.Equals(semanticModel.GetSymbolInfo(inv).Symbol, methodSymbol));
+
+            // 3. If there are no calls, it might be an unused method or an entry point (return false to be safe)
+            var invocationList = invocations.ToList();
+            if (!invocationList.Any()) return false;
+
+            // 4. Check if every invocation is wrapped in a constructor
+            foreach (var inv in invocationList)
+            {
+                var parentCtor = inv.Ancestors().OfType<ConstructorDeclarationSyntax>().FirstOrDefault();
+        
+                // If we find an invocation that is NOT in a constructor, the method "escapes" initialization
+                if (parentCtor == null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        
         public static string GetThreadName(ObjectCreationExpressionSyntax creation)
         {
             if (creation.Parent is EqualsValueClauseSyntax evc && evc.Parent is VariableDeclaratorSyntax vds)

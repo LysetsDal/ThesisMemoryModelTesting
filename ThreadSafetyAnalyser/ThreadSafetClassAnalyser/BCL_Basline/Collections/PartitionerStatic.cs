@@ -106,7 +106,7 @@ namespace System.Collections.Concurrent
     /// thread.
     /// </para>
     /// </remarks>
-    [ThreadSafe]
+    // [ThreadSafe]
     public static class Partitioner
     {
         // How many chunks do we want to divide the range into?  If this is 1, then the

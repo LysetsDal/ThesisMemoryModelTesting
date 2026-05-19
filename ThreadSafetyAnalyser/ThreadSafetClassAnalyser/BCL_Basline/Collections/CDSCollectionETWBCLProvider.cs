@@ -20,7 +20,7 @@ namespace System.Collections.Concurrent
         Name = "System.Collections.Concurrent.ConcurrentCollectionsEventSource",
         Guid = "35167F8E-49B2-4b96-AB86-435B59336B5E"
         )]
-    [ThreadSafe]
+    // [ThreadSafe]
     internal sealed partial class CDSCollectionETWBCLProvider : EventSource
     {
         /// <summary>

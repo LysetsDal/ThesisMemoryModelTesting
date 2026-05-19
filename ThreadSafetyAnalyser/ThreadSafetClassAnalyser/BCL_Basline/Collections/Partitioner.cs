@@ -78,7 +78,7 @@ namespace System.Collections.Concurrent
     /// </para>
     /// </remarks>
     ///
-    [ThreadSafe]
+    // [ThreadSafe]
     public abstract class Partitioner<TSource>
     {
         /// <summary>

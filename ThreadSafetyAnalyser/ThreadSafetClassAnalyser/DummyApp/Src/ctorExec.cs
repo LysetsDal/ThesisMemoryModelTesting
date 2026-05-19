@@ -3,7 +3,7 @@ using Annotations;
 
 namespace DummyApp.Src;
 
-[ThreadSafe]
+// [ThreadSafe]
 public class ctorExec
 {
     int[] _buffer = new int[10];    // SP001: mutable array field — array contents can be modified after construction
@@ -15,7 +15,7 @@ public class ctorExec
 
     public virtual void PrintFields() { }
 }
-[ThreadSafe]
+// [ThreadSafe]
 class B : ctorExec
 {
     int hello = 1;

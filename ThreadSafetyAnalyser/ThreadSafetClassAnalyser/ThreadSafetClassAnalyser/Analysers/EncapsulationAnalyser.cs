@@ -179,32 +179,39 @@ namespace ThreadSafetClassAnalyser.Analysers
             var memberAccess = (MemberAccessExpressionSyntax)context.Node;
             var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
             
-            if (!ThreadSafeValidator.ShouldValidateTarget(symbol)) return;
+            if (symbol == null || !ThreadSafeValidator.ShouldValidateTarget(symbol)) return;
             
             var memberName = memberAccess.Name.Identifier.Text;
             var className = context.ContainingSymbol?.ContainingType;
 
             // Only run this logic for Methods
-            if (!(context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol is IMethodSymbol methodSymbol)) return;
+            var methodSymbol = symbol as IMethodSymbol;
+            if (methodSymbol == null) return;
             
             // Only for source code files (not SDK Libs)
-            var isInSource = methodSymbol.Locations.FirstOrDefault().IsInSource;
-            if (!isInSource) return;
+            var syntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+            if (syntaxRef == null) return;
             
-            if (!(methodSymbol.ContainingSymbol is INamedTypeSymbol)) return;
+            var methodDecl = syntaxRef.GetSyntax() as MethodDeclarationSyntax;
+            if (methodDecl == null) return;
+            
+            // If the target method doesn't access any mutable fields or properties of the class,
+            // it cannot possibly create an unsafe unsynchronized state condition!
+            var accessedFields = AnalyzerUtils.GetAccessedFieldsFromMethod(methodDecl, context.SemanticModel);
+            if (accessedFields == null || accessedFields.Count == 0)
+            {
+                return;
+            }
             
             // Find any locks inside method call
             var methodDescendantLock = LockAssociationUtils.FindFirstDescendantLockFromMethodSymbol(methodSymbol);
-            // Pt 'dumb' only knows if a Method call has a lock somewhere inside before a method, prop or class boundary is hit
             if (methodDescendantLock != null) return;
             
             // Does the current context have an ancestor lock around it?
             var callSiteAncestorLock = 
                 LockAssociationUtils.GetFirstAncestorLockFromSymbol(memberAccess, context.SemanticModel);
-            // If it does it is safe
             if (callSiteAncestorLock != null) return;
             
-            // 
             if (AnalyzerUtils.IsInternallySynchronized(methodSymbol, context.SemanticModel)) 
                 return;
             

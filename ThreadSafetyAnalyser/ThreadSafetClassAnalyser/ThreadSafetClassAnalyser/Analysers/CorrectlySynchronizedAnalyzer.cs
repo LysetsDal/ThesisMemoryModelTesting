@@ -314,6 +314,11 @@ namespace ThreadSafetClassAnalyser.Analysers
             {
                 var methodSymbol = semanticModel.GetDeclaredSymbol(methodDecl);
                 if (methodSymbol == null) return null;
+                
+                if (SyntaxUtils.IsExclusivelyConstructorCalled(methodSymbol, semanticModel, classDecl))
+                {
+                    return null; 
+                }
 
                 return new
                 {

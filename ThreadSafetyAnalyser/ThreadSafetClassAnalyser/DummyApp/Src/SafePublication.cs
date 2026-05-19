@@ -36,7 +36,7 @@ public class SafePublication
 {
     private static LeakyConstructor _globalInstance;
     
-    [ThreadSafe]
+    // [ThreadSafe]
     private class LeakyConstructor
     {
         public readonly int Data;
@@ -47,7 +47,7 @@ public class SafePublication
         }
     }
 
-    [ThreadSafe]
+    // [ThreadSafe]
     private class ExternalCallLeakyConstructor
     {
 #pragma warning disable PublicFieldExposed
@@ -70,7 +70,7 @@ public class SafePublication
         }
     }
 
-    [ThreadSafe]
+    // [ThreadSafe]
     private class EventLeakyConstructor
     {
         public readonly int Data;

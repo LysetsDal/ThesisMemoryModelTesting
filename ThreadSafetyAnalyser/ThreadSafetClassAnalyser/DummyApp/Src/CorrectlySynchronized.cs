@@ -8,7 +8,7 @@ using Annotations;
 
 namespace DummyApp.Src;
 
-[ThreadSafe]
+// [ThreadSafe]
 public class CorrectlySynchronized
 {
     private int Count { get; set; } = 0;

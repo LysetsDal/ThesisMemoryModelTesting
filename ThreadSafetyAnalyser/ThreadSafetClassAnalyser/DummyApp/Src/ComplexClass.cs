@@ -37,7 +37,7 @@ namespace DummyApp.Src;
 /// <summary>
 /// Excerpt from Audit.NET repo see https://github.com/thepirat000/Audit.NET#
 /// </summary>
-// [ThreadSafe]
+[ThreadSafe]
 public class ComplexClass
 {
     private readonly object _lock = new();
@@ -117,14 +117,14 @@ public class ComplexClass
                 }
             }
         }
-        // Should flag InternalFieldNoLock warning
         return _clientSend;
+        // Should flag InternalFieldNoLock warning
     }
     
     // Should flag warning ConflictingAccessRule 
     private AuditEvent GetReceiveClient()
     {
-        lock (_lockerReceive)
+        lock (_lockerSend)
         {
             if (_clientReceive == null)
             {

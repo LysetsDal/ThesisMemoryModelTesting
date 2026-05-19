@@ -1,6 +1,6 @@
-// ReSharper disable RedundantUsingDirective
+namespace DummyApp.Src;
 
-using System;
+// ReSharper disable RedundantUsingDirective
 using System.Collections;
 using System.Collections.Concurrent;
 using Annotations;
@@ -73,7 +73,6 @@ using System.Threading;
 // LOC:                 617 (includes nested class)
 // %%%%%%%%%%%%%%%%%%%%%%%%%
 
-namespace BCL_Basline.Collections;
 
 #nullable enable
 
@@ -82,7 +81,7 @@ namespace BCL_Basline.Collections;
 /// <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
 [DebuggerTypeProxy(typeof (IDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-// [ThreadSafe]
+[ThreadSafe]
 public class ConcurrentDictionary<TKey, TValue> : 
   IDictionary<TKey, TValue>,
   ICollection<KeyValuePair<TKey, TValue>>,
