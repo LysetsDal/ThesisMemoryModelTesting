@@ -10,5 +10,9 @@ namespace ThreadSafetClassAnalyser.Model
         public AccessType AccessType { get; set; }
         
         public ISymbol LockObject { get; set; }
+        
+        public bool IsVolatile { get; set; } 
+        
+        public bool IsAtomicCall { get; set; }
     }
 }

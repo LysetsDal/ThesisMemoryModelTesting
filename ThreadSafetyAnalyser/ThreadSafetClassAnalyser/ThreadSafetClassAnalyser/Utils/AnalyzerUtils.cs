@@ -194,7 +194,13 @@ namespace ThreadSafetClassAnalyser.Utils
                 var isWrite = IsWriteAccess(id);
                 var effectiveLock = currentLockSymbol ?? LockAssociationUtils.GetFirstAncestorLockFromSymbol(id, model);
                     
-                UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock);
+                // NEW: Check if the field is volatile
+                var isVolatile = (sym is IFieldSymbol field && field.IsVolatile);
+
+                // NEW: Check if this specific usage is inside an Interlocked/Volatile method call
+                var isAtomicCall = IsInsideThreadSafePrimitive(id, model);
+                
+                UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock, isVolatile, isAtomicCall);
             }
 
             // 2. Process Invocations (Stepping into methods)
@@ -229,7 +235,7 @@ namespace ThreadSafetClassAnalyser.Utils
         /// (e.g., tracing <c>obj.NestedProperty.Field</c> up to its assignment context) before 
         /// checking for mutating expressions like <c>=</c>, <c>+=</c>, <c>++</c>, or <c>--</c>.
         /// Note: if the identifier resolves to an element access (e.g. <c>arr[i] = val</c>) or a
-        /// parenthesized expression on the left-hand side, it is treated as a read — only the element
+        /// parenthesized expression on the left-hand side, it is treated as a read ï¿½ only the element
         /// is written, not the field itself.
         /// </remarks>
         public static bool IsWriteAccess(IdentifierNameSyntax identifier)
@@ -240,7 +246,7 @@ namespace ThreadSafetClassAnalyser.Utils
             while (current.Parent is MemberAccessExpressionSyntax || current.Parent is ElementAccessExpressionSyntax)
             {
                 // If the identifier is inside bracket arguments (e.g. arr[field]) or a parenthesized
-                // expression, the field is only being read — not written.
+                // expression, the field is only being read ï¿½ not written.
                 if (current.Parent is ElementAccessExpressionSyntax elementAccess && elementAccess.Expression != current)
                     return false;
 
@@ -251,7 +257,7 @@ namespace ThreadSafetClassAnalyser.Utils
             }
 
             // If the walked-up expression is itself an element access (e.g. _array[i] = val),
-            // the field is only read to obtain the collection reference — not written.
+            // the field is only read to obtain the collection reference ï¿½ not written.
             if (current is ElementAccessExpressionSyntax)
                 return false;
 
@@ -274,26 +280,45 @@ namespace ThreadSafetClassAnalyser.Utils
         /// <param name="symbol">The field or property symbol being accessed.</param>
         /// <param name="type">The type of access detected (<see cref="AccessType.Read"/> or <see cref="AccessType.Write"/>).</param>
         /// <param name="currentLock">The symbol representing the lock object protecting this specific access, or <see langword="null"/>.</param>
+        /// <param name="isVolatile">The symbol is a volatile type</param>
+        /// <param name="isAtomicCall">Uses Interlocked to call</param>
         /// <remarks>
         /// <b>Lock Poisoning Logic:</b> If a symbol is accessed multiple times across different code paths, 
         /// its attributes are aggregated. A <see cref="AccessType.Write"/> will permanently overwrite a <see cref="AccessType.Read"/>. 
         /// Crucially, if the symbol is accessed under two <i>different</i> locks (or locked in one place but unlocked in another), 
         /// the <see cref="AccessInfo.LockObject"/> is permanently set to <see langword="null"/>, indicating inconsistent synchronization.
         /// </remarks>
-        private static void UpdateAccessMap(IDictionary<ISymbol, AccessInfo> map, ISymbol symbol, AccessType type, ISymbol currentLock)
+        private static void UpdateAccessMap(
+            IDictionary<ISymbol, AccessInfo> map, 
+            ISymbol symbol, 
+            AccessType type, 
+            ISymbol currentLock,
+            bool isVolatile,
+            bool isAtomicCall)
         {
             if (map.TryGetValue(symbol, out var existing))
             {
                 if (type == AccessType.Write) existing.AccessType = AccessType.Write;
-                
+        
+                // If one access is locked and another isn't, LockObject becomes null (inconsistent)
                 if (!SymbolEqualityComparer.Default.Equals(existing.LockObject, currentLock))
                 {
                     existing.LockObject = null; 
                 }
+        
+                // Accumulate atomic properties
+                existing.IsVolatile |= isVolatile;
+                existing.IsAtomicCall |= isAtomicCall;
             }
             else
             {
-                map[symbol] = new AccessInfo { AccessType = type, LockObject = currentLock };
+                map[symbol] = new AccessInfo 
+                { 
+                    AccessType = type, 
+                    LockObject = currentLock,
+                    IsVolatile = isVolatile,
+                    IsAtomicCall = isAtomicCall
+                };
             }
         }
 
@@ -371,18 +396,18 @@ namespace ThreadSafetClassAnalyser.Utils
                         var containingType = symbol.ContainingType.ToDisplayString();
                         var methodName = symbol.Name;
 
-                        // Thread.MemoryBarrier() — explicit full fence
+                        // Thread.MemoryBarrier() ï¿½ explicit full fence
                         if (containingType == KnownTypes.FullThreadName && methodName == KnownTypes.MemoryBarrier)
                             return true;
 
-                        // Interlocked.* — no read or write can move past an interlocked operation in either direction
+                        // Interlocked.* ï¿½ no read or write can move past an interlocked operation in either direction
                         // Covers: Exchange, CompareExchange, Add, Increment, Decrement, Read, Or, And
                         // https://learn.microsoft.com/en-us/archive/msdn-magazine/2005/october/understanding-low-lock-techniques-in-multithreaded-apps
                         if (containingType == KnownTypes.FullInterlockedName)
                             return true;
 
-                        // Monitor.Enter / Monitor.TryEnter — acquire fence
-                        // Monitor.Exit — release fence
+                        // Monitor.Enter / Monitor.TryEnter ï¿½ acquire fence
+                        // Monitor.Exit ï¿½ release fence
                         // Together (or individually between a write and read) they act as a full fence
                         if (containingType == KnownTypes.FullMonitorName &&
                             (methodName == "Enter" || methodName == "Exit" || methodName == "TryEnter"))
@@ -390,7 +415,7 @@ namespace ThreadSafetClassAnalyser.Utils
                     }
                 }
 
-                // lock statement — full fence on both entry (acquire) and exit (release)
+                // lock statement ï¿½ full fence on both entry (acquire) and exit (release)
                 // Syntactic sugar over Monitor.Enter / Monitor.Exit
                 if (node is LockStatementSyntax)
                     return true;
@@ -420,7 +445,7 @@ namespace ThreadSafetClassAnalyser.Utils
         
         /// <summary>
         /// Returns <see langword="true"/> if <paramref name="node"/> is protected by the
-        /// <c>Monitor.Enter</c> / <c>Monitor.Exit</c> manual-lock pattern — i.e. a
+        /// <c>Monitor.Enter</c> / <c>Monitor.Exit</c> manual-lock pattern ï¿½ i.e. a
         /// <c>Monitor.Enter</c> call precedes it in the method body, and it is enclosed
         /// in a try/finally whose finally block calls <c>Monitor.Exit</c>.
         /// </summary>
@@ -462,7 +487,7 @@ namespace ThreadSafetClassAnalyser.Utils
 
         /// <summary>
         /// Returns <see langword="true"/> if the given finally clause contains a
-        /// <c>Monitor.Exit</c> call — indicating a manually managed lock release.
+        /// <c>Monitor.Exit</c> call ï¿½ indicating a manually managed lock release.
         /// </summary>
         private static bool HasMonitorExitInFinally(FinallyClauseSyntax finallyClause, SemanticModel model)
         {

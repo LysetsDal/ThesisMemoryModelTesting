@@ -1,3 +1,4 @@
+using System;
 using Annotations;
 using DummyApp.Src;
 // ReSharper disable UnusedVariable

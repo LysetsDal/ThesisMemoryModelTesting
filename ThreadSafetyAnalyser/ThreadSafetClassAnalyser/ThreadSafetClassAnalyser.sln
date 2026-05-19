@@ -22,6 +22,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DummyApp", "DummyApp\DummyA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreadsafeClassAnalyser.Annotations", "ThreadsafeClassAnalyser.Annotations\ThreadsafeClassAnalyser.Annotations.csproj", "{02E38E1E-392B-4296-8823-BF43C0C5526A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BCL_Basline", "BCL_Basline\BCL_Basline.csproj", "{F8BC67B9-5AFC-4AF5-822A-CEC2DC025695}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{02E38E1E-392B-4296-8823-BF43C0C5526A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{02E38E1E-392B-4296-8823-BF43C0C5526A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{02E38E1E-392B-4296-8823-BF43C0C5526A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F8BC67B9-5AFC-4AF5-822A-CEC2DC025695}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F8BC67B9-5AFC-4AF5-822A-CEC2DC025695}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F8BC67B9-5AFC-4AF5-822A-CEC2DC025695}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F8BC67B9-5AFC-4AF5-822A-CEC2DC025695}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

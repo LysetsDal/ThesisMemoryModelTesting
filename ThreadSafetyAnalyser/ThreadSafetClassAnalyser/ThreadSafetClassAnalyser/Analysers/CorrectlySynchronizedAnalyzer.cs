@@ -335,11 +335,14 @@ namespace ThreadSafetClassAnalyser.Analysers
                 {
                     var m1 = analyzedMembers[i];
                     var m2 = analyzedMembers[j];
-
-                    // Macro-check: Do the methods share a top-level lock?
-                    // if (m1.UsedLockObjects.Intersect(m2.UsedLockObjects, SymbolEqualityComparer.Default).Any())
-                    //     continue;
-
+                    
+                    // IMPROVEMENT: Avoid flagging wrapper methods
+                    // If one method symbol is found inside the other's syntax tree, skip the comparison
+                    if (m1.Syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .Any(inv => SymbolEqualityComparer.Default.Equals(semanticModel.GetSymbolInfo(inv).Symbol, m2.Symbol))) continue;
+                    if (m2.Syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                        .Any(inv => SymbolEqualityComparer.Default.Equals(semanticModel.GetSymbolInfo(inv).Symbol, m1.Symbol))) continue;
+                    
                     // Find overlapping field/property accesses
                     var conflicts = AnalyzerUtils.FindConflicts(m1.AccessMap, m2.AccessMap);
 
@@ -352,6 +355,16 @@ namespace ThreadSafetClassAnalyser.Analysers
                         var info2 = m2.AccessMap[conflict];
 
                         if (AnalyzerUtils.IsUsingSameLockObject(info1, info2)) continue;
+                        
+                        var protectedByLock = AnalyzerUtils.IsUsingSameLockObject(info1, info2);
+
+                        // If both sides use Interlocked/Volatile, or the field is volatile, 
+                        // it satisfies the "Correctly Synchronized" property for simple state.
+                        var protectedByAtomics = (info1.IsVolatile || info1.IsAtomicCall) && 
+                                                  (info2.IsVolatile || info2.IsAtomicCall);
+                        
+                        // Check for Correctly Synchronized 
+                        if (protectedByLock || protectedByAtomics) continue;
                         
                         // Only flag Method 1 if it hasn't been warned about this specific field yet
                         if (reportedConflicts.Add((m1.Syntax, conflict)))
