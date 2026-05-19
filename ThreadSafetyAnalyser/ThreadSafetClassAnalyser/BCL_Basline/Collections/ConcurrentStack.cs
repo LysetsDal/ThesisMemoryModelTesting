@@ -1,3 +1,4 @@
+// ReSharper disable RedundantUsingDirective
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
@@ -8,12 +9,36 @@
 // A lock-free, concurrent stack primitive, and its associated debugger view type.
 //
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-
+// ReSharper disable RedundantUsingDirective
 using Annotations;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
+
+// ReSharper disable ClassWithVirtualMembersNeverInherited.Global
+// ReSharper disable InconsistentNaming
+// ReSharper disable RedundantExtendsListEntry
+// ReSharper disable UnusedMember.Global
+// ReSharper disable NonAtomicCompoundOperator
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable UsePatternMatching
+// ReSharper disable UnusedType.Global
+// ReSharper disable RedundantExtendsListEntry
+// ReSharper disable SuggestVarOrType_BuiltInTypes
+// ReSharper disable UseCollectionExpression
+// ReSharper disable SuggestVarOrType_SimpleTypes
+// ReSharper disable EmptyEmbeddedStatement
+// ReSharper disable NotAccessedOutParameterVariable
+// ReSharper disable ArrangeAccessorOwnerBody
+// ReSharper disable InconsistentNaming
+// ReSharper disable MemberCanBeMadeStatic.Local
+// ReSharper disable CheckNamespace
+// ReSharper disable ConditionIsAlwaysTrueOrFalse
+// ReSharper disable InlineOutVariableDeclaration
+// ReSharper disable ArrangeDefaultValueWhenTypeNotEvident
+// ReSharper disable RedundantAssignment
 
 namespace System.Collections.Concurrent
 {

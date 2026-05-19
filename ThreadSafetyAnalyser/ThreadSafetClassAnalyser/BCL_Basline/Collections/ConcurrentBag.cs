@@ -1,3 +1,4 @@
+// ReSharper disable RedundantUsingDirective
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -8,6 +9,12 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Annotations;
 
+// ReSharper disable ClassWithVirtualMembersNeverInherited.Global
+// ReSharper disable InconsistentNaming
+// ReSharper disable RedundantExtendsListEntry
+// ReSharper disable UnusedMember.Global
+// ReSharper disable NonAtomicCompoundOperator
+// ReSharper disable MemberCanBePrivate.Global
 // ReSharper disable SuggestVarOrType_Elsewhere
 // ReSharper disable UsePatternMatching
 // ReSharper disable UnusedType.Global
@@ -20,6 +27,13 @@ using Annotations;
 // ReSharper disable ArrangeAccessorOwnerBody
 // ReSharper disable InconsistentNaming
 // ReSharper disable MemberCanBeMadeStatic.Local
+// ReSharper disable CheckNamespace
+// ReSharper disable ConditionIsAlwaysTrueOrFalse
+// ReSharper disable InlineOutVariableDeclaration
+// ReSharper disable ArrangeDefaultValueWhenTypeNotEvident
+// ReSharper disable RedundantAssignment
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable RedundantCast
 
 namespace BCL_Basline.Collections;
 // Licensed to the .NET Foundation under one or more agreements.
@@ -44,7 +58,7 @@ namespace BCL_Basline.Collections;
 /// concurrently from multiple threads.
 /// </para>
 /// </remarks>
-[ThreadSafe]
+// [ThreadSafe]
 [DebuggerDisplay("Count = {Count}")]
 [SuppressMessage("Performance", "CA1822:Mark members as static")]
 public class ConcurrentBag<T> : IProducerConsumerCollection<T>, IReadOnlyCollection<T>, ICollection, IEnumerable

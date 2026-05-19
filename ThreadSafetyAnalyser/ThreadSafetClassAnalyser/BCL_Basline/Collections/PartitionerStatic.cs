@@ -9,11 +9,43 @@
 //
 // =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+// ReSharper disable RedundantUsingDirective
 using Annotations;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
+// ReSharper disable RedundantTypeArgumentsOfMethod
+// ReSharper disable UnusedMemberInSuper.Global
+// ReSharper disable ReturnTypeCanBeNotNullable
+// ReSharper disable PossibleMultipleEnumeration
+// ReSharper disable RedundantBaseConstructorCall
+
+// ReSharper disable ClassWithVirtualMembersNeverInherited.Global
+// ReSharper disable InconsistentNaming
+// ReSharper disable RedundantExtendsListEntry
+// ReSharper disable UnusedMember.Global
+// ReSharper disable NonAtomicCompoundOperator
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable UsePatternMatching
+// ReSharper disable UnusedType.Global
+// ReSharper disable RedundantExtendsListEntry
+// ReSharper disable SuggestVarOrType_BuiltInTypes
+// ReSharper disable UseCollectionExpression
+// ReSharper disable SuggestVarOrType_SimpleTypes
+// ReSharper disable EmptyEmbeddedStatement
+// ReSharper disable NotAccessedOutParameterVariable
+// ReSharper disable ArrangeAccessorOwnerBody
+// ReSharper disable InconsistentNaming
+// ReSharper disable MemberCanBeMadeStatic.Local
+// ReSharper disable CheckNamespace
+// ReSharper disable ConditionIsAlwaysTrueOrFalse
+// ReSharper disable InlineOutVariableDeclaration
+// ReSharper disable ArrangeDefaultValueWhenTypeNotEvident
+// ReSharper disable RedundantAssignment
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable RedundantCast
 
 namespace System.Collections.Concurrent
 {
