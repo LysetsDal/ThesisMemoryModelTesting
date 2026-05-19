@@ -40,6 +40,14 @@ using System.Threading;
 // ReSharper disable ArrangeDefaultValueWhenTypeNotEvident
 // ReSharper disable RedundantAssignment
 
+// %%%% THESIS METADATA %%%%
+// Top-level fields:       4 (includes nested class)
+// Props:                  4 (includes nested class)
+// Constructors:           3 (includes nested class)
+// Methods:               24 (includes nested class)
+// LOC:                  309 (includes nested class)
+// %%%%%%%%%%%%%%%%%%%%%%%%%
+
 namespace System.Collections.Concurrent
 {
     // A stack that uses CAS operations internally to maintain thread-safety in a lock-free

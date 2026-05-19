@@ -47,6 +47,14 @@ using System.Threading;
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable RedundantCast
 
+// %%%% THESIS METADATA %%%%
+// Top-level fields:      46
+// Props:                 20
+// Constructors:          21
+// Methods:               44 
+// LOC:                  870 (includes all nested class)
+// %%%%%%%%%%%%%%%%%%%%%%%%%
+
 namespace System.Collections.Concurrent
 {
     /// <summary>

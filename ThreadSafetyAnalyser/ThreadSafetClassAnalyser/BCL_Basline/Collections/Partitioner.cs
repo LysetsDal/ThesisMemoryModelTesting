@@ -40,6 +40,14 @@ using System.Collections.Generic;
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable RedundantCast
 
+// %%%% THESIS METADATA %%%%
+// Top-level fields:       0
+// Props:                  1
+// Constructors:           0
+// Methods:                2 
+// LOC:                   18 (includes nested class)
+// %%%%%%%%%%%%%%%%%%%%%%%%%
+
 namespace System.Collections.Concurrent
 {
     /// <summary>

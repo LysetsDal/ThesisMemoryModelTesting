@@ -35,6 +35,14 @@ using Annotations;
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable RedundantCast
 
+// %%%% THESIS METADATA %%%%
+// Top-level fields:      4
+// Props:                 5
+// Constructors:          2
+// Methods:              18
+// LOC:                 617 (includes nested class)
+// %%%%%%%%%%%%%%%%%%%%%%%%%
+
 namespace BCL_Basline.Collections;
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
@@ -684,6 +692,13 @@ public class ConcurrentBag<T> : IProducerConsumerCollection<T>, IReadOnlyCollect
         }
     }
 
+    // %%%% THESIS METADATA %%%%
+    // Top-level fields:      12
+    // Props:                  2
+    // Constructors:           1
+    // Methods:                6
+    // LOC:                  270
+    // %%%%%%%%%%%%%%%%%%%%%%%%%
     /// <summary>Provides a work-stealing queue data structure stored per thread.</summary>
     private sealed class WorkStealingQueue
     {
