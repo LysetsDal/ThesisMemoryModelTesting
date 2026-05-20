@@ -314,6 +314,12 @@ namespace ThreadSafetClassAnalyser.Analysers
                     // Check if the field is used as an argument to one of the atomic methods
                     if (AnalyzerUtils.IsInsideThreadSafePrimitive(info.Usage, context.SemanticModel))
                         continue;
+                    
+                    var fieldSymbol = memberSymbol as IFieldSymbol;
+                    if (fieldSymbol != null && fieldSymbol.IsVolatile && !info.IsWrite)
+                    {
+                        continue;
+                    }
 
                     // SCENARIO A: No lock used
                     if (info.LockSymbol == null)
