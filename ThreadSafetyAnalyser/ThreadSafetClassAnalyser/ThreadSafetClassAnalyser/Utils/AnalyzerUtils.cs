@@ -208,8 +208,12 @@ namespace ThreadSafetClassAnalyser.Utils
             var identifiers = node.DescendantNodes().OfType<IdentifierNameSyntax>();
             foreach (var id in identifiers)
             {
+                if (id.Ancestors().OfType<AttributeSyntax>().Any()) 
+                    continue;
+                
                 var info = model.GetSymbolInfo(id);
                 var sym = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
+                
 
                 if (sym == null ||
                     (sym.Kind != SymbolKind.Field && sym.Kind != SymbolKind.Property)) continue;
@@ -234,7 +238,6 @@ namespace ThreadSafetClassAnalyser.Utils
 
                 // Cascade the active lock symbol context down to callee methods during the jump
                 var lockAtCallSite = activeLock ?? LockAssociationUtils.GetFirstAncestorLockFromSymbol(invocation, model);
-
                 foreach (var reference in methodSymbol.DeclaringSyntaxReferences)
                 {
                     var methodSyntax = reference.GetSyntax();
@@ -357,7 +360,8 @@ namespace ThreadSafetClassAnalyser.Utils
             {
                 if (!method2AccessMap.TryGetValue(field, out var info2)) continue;
                 var info1 = method1AccessMap[field];
-
+                
+                
                 // 1. Basic conflict check (at least one write)
                 if (info1.AccessType == AccessType.Write || info2.AccessType == AccessType.Write)
                 {

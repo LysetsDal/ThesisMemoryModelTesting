@@ -314,20 +314,25 @@ namespace ThreadSafetClassAnalyser.Analysers
             {
                 var methodSymbol = semanticModel.GetDeclaredSymbol(methodDecl);
                 if (methodSymbol == null) return null;
+                var methodName = methodSymbol.Name;
                 
                 if (SyntaxUtils.IsExclusivelyConstructorCalled(methodSymbol, semanticModel, classDecl))
                 {
                     return null; 
                 }
 
-                return new
+                var res = new
                 {
                     Syntax = methodDecl,
                     Symbol = methodSymbol,
-                    Name = methodSymbol.Name,
-                    AccessMap = AnalyzerUtils.GetAccessedFieldsFromMethod(methodDecl, semanticModel),
-                    UsedLockObjects = AnalyzerUtils.GetLockObjectsUsedInMember(classLocks, methodSymbol).ToList()
+                    Name = methodName,
+                    AccessMap =
+                        AnalyzerUtils.GetAccessedFieldsFromMethod(methodDecl, semanticModel),
+                    UsedLockObjects = AnalyzerUtils
+                        .GetLockObjectsUsedInMember(classLocks, methodSymbol).ToList()
                 };
+
+                return res;
             }).Where(m => m != null).ToList();
             
             // A set of distinct conflicts (MethodName, sharedState)
@@ -359,7 +364,11 @@ namespace ThreadSafetClassAnalyser.Analysers
                         var info1 = m1.AccessMap[conflict];
                         var info2 = m2.AccessMap[conflict];
 
-                        if (AnalyzerUtils.IsUsingSameLockObject(info1, info2)) continue;
+                        // If both sides are just reading the data, it is completely thread-safe!
+                        if (info1.AccessType == AccessType.Read && info2.AccessType == AccessType.Read) 
+                        {
+                            continue;
+                        }
                         
                         var protectedByLock = AnalyzerUtils.IsUsingSameLockObject(info1, info2);
 
@@ -370,6 +379,7 @@ namespace ThreadSafetClassAnalyser.Analysers
                         
                         // Check for Correctly Synchronized 
                         if (protectedByLock || protectedByAtomics) continue;
+
                         
                         // Only flag Method 1 if it hasn't been warned about this specific field yet
                         if (reportedConflicts.Add((m1.Syntax, conflict)))
