@@ -68,3 +68,5 @@ target/
 #IDEs
 .idea/
 .DS_Store
+
+.sarif/

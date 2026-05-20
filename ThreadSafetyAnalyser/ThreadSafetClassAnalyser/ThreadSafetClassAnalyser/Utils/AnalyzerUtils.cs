@@ -44,42 +44,39 @@ namespace ThreadSafetClassAnalyser.Utils
             int currentDepth = 0, 
             HashSet<IMethodSymbol> visited = null)
         {
-            // 1. Terminal cases & Performance Guards (Reverted to classic null-checking logic)
+            // 1. Terminal cases & Performance Guards
             if (methodSymbol == null || currentDepth > MaxAnalysisDepth) return false;
             
-            // Explicit constructor type allocation replacing modern target-typed expressions
             if (visited == null)
             {
                 visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
             }
 
-            // Prevent infinite recursion loops from mutual recursion or cycles
             if (!visited.Add(methodSymbol)) return false;
 
-            // 2. Metadata Check: Reverted 'or' matching blocks to standard evaluation statements
+            // 2. Metadata Check: Include SemaphoreSlim as an inherently safe system primitive
             var typeName = methodSymbol.ContainingType?.ToDisplayString();
             if (typeName == KnownTypes.FullInterlockedName || 
                 typeName == KnownTypes.FullVolatileName || 
-                typeName == KnownTypes.FullMonitorName)
+                typeName == KnownTypes.FullMonitorName ||
+                typeName == KnownTypes.FullSemaphoreSlimName)
             {
                 return true;
             }
 
-            // 3. Extract Declaring Syntax using safe classic decomposition blocks
             var syntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
             if (syntaxRef == null) return false;
 
             var syntax = syntaxRef.GetSyntax();
 
-            // 4. Intra-procedural Check: Direct syntactic locks within this block
+            // 4. Intra-procedural Check
             if (syntax.DescendantNodes().OfType<LockStatementSyntax>().Any())
                 return true;
 
-            // 5. Inter-procedural Check: Analyze method invocations recursively
+            // 5. Inter-procedural Check
             var invocations = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocations)
             {
-                // Reverted pattern matching expression back to direct 'as' assignments
                 var invokedSymbol = semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
                 if (invokedSymbol == null) 
                     continue;
@@ -88,16 +85,18 @@ namespace ThreadSafetClassAnalyser.Utils
                 if (!SymbolEqualityComparer.Default.Equals(invokedSymbol.ContainingType, methodSymbol.ContainingType))
                 {
                     var extTypeName = invokedSymbol.ContainingType?.ToDisplayString();
+                    // Match external calls against the expanded primitive list
                     if (extTypeName == KnownTypes.FullInterlockedName || 
                         extTypeName == KnownTypes.FullVolatileName || 
-                        extTypeName == KnownTypes.FullMonitorName)
+                        extTypeName == KnownTypes.FullMonitorName ||
+                        extTypeName == KnownTypes.FullSemaphoreSlimName)
                     {
                         return true;
                     }
                     continue; 
                 }
 
-                // RECURSION: Deep crawl inside the class boundary tracking program stack depths
+                // RECURSION
                 if (IsInternallySynchronized(invokedSymbol, semanticModel, currentDepth + 1, visited))
                 {
                     return true;

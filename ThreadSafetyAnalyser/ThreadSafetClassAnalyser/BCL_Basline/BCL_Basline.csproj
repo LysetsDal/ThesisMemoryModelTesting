@@ -4,6 +4,8 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <EnableNetAnalyzers>false</EnableNetAnalyzers>
+        <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild><EnforceCodeStyleInBuild></EnforceCodeStyleInBuild>
     </PropertyGroup>
 
     <ItemGroup>
