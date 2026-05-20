@@ -217,6 +217,11 @@ namespace ThreadSafetClassAnalyser.Utils
                 if (sym == null ||
                     (sym.Kind != SymbolKind.Field && sym.Kind != SymbolKind.Property)) continue;
                 
+                // If a field is readonly, or a property has no setter, it cannot be raced on.
+                // Constants (IsConst) and ReadOnly fields can never be raced on.
+                if (sym is IFieldSymbol readonlyField && (readonlyField.IsReadOnly || readonlyField.IsConst)) continue;
+                if (sym is IPropertySymbol prop && (prop.IsReadOnly || prop.SetMethod == null)) continue;
+                
                 var isWrite = IsWriteAccess(id);
                 
                 // Use the dynamically discovered manual lock if a syntactic ancestor lock is missing
