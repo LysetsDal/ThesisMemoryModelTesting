@@ -5,6 +5,8 @@ namespace ThreadSafetClassAnalyser.Utils
         public const string Task = "Task";
         public const string Thread = "Thread";
         public const string Volatile = "Volatile";
+        public const string VolatileReadOp = "VolatileRead";
+        public const string VolatileWriteOp = "VolatileWrite";
         public const string Interlocked = "Interlocked";
         public const string MemoryBarrier = "MemoryBarrier";
         

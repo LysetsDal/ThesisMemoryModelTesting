@@ -106,7 +106,7 @@ namespace System.Collections.Concurrent
     /// thread.
     /// </para>
     /// </remarks>
-    // [ThreadSafe]
+    [ThreadSafe]
     public static class Partitioner
     {
         // How many chunks do we want to divide the range into?  If this is 1, then the
@@ -344,6 +344,7 @@ namespace System.Collections.Concurrent
         //  - TSource[], when source data is TSource[], the shared reader is source data itself
         //  - IEnumerator<TSource>, when source data is IEnumerable<TSource>, and the shared reader is an
         //    enumerator of the source data
+        [ThreadSafe]
         private abstract class DynamicPartitionEnumerator_Abstract<TSource, TSourceReader> : IEnumerator<KeyValuePair<long, TSource>>
         {
             //----------------- common fields and constructor for all dynamic partitioners -----------------
@@ -521,6 +522,7 @@ namespace System.Collections.Concurrent
         /// of EnumerableOfPartitionsForIEnumerator defined internally
         /// </summary>
         /// <typeparam name="TSource">Type of elements in the source data</typeparam>
+        [ThreadSafe]
         private sealed class DynamicPartitionerForIEnumerable<TSource> : OrderablePartitioner<TSource>
         {
             private readonly IEnumerable<TSource> _source;
@@ -1190,6 +1192,7 @@ namespace System.Collections.Concurrent
         /// of EnumerableOfPartitionsForIList defined internally
         /// </summary>
         /// <typeparam name="TSource">Type of elements in the source data</typeparam>
+        [ThreadSafe]
         private sealed class DynamicPartitionerForIList<TSource> : DynamicPartitionerForIndexRange_Abstract<TSource, IList<TSource>>
         {
             //constructor
@@ -1208,6 +1211,7 @@ namespace System.Collections.Concurrent
             /// Inherits from PartitionList_Abstract
             /// Provides customized implementation for source data of IList
             /// </summary>
+            [ThreadSafe]
             private sealed class InternalPartitionEnumerable : IEnumerable<KeyValuePair<long, TSource>>
             {
                 //reader through which we access the source data
@@ -1235,6 +1239,7 @@ namespace System.Collections.Concurrent
             /// Inherits from DynamicPartitionEnumeratorForIndexRange_Abstract
             /// Provides customized implementation of SourceCount property and Current property for IList
             /// </summary>
+            [ThreadSafe]
             private sealed class InternalPartitionEnumerator : DynamicPartitionEnumeratorForIndexRange_Abstract<TSource, IList<TSource>>
             {
                 //constructor
@@ -1276,6 +1281,7 @@ namespace System.Collections.Concurrent
         /// of EnumerableOfPartitionsForArray defined internally
         /// </summary>
         /// <typeparam name="TSource">Type of elements in the source data</typeparam>
+        [ThreadSafe]
         private sealed class DynamicPartitionerForArray<TSource> : DynamicPartitionerForIndexRange_Abstract<TSource, TSource[]>
         {
             //constructor
@@ -1293,6 +1299,7 @@ namespace System.Collections.Concurrent
             /// Inherits from PartitionList_Abstract
             /// Provides customized implementation for source data of Array
             /// </summary>
+            [ThreadSafe]
             private sealed class InternalPartitionEnumerable : IEnumerable<KeyValuePair<long, TSource>>
             {
                 //reader through which we access the source data
@@ -1321,6 +1328,7 @@ namespace System.Collections.Concurrent
             /// Inherits from DynamicPartitionEnumeratorForIndexRange_Abstract
             /// Provides customized implementation of SourceCount property and Current property for Array
             /// </summary>
+            [ThreadSafe]
             private sealed class InternalPartitionEnumerator : DynamicPartitionEnumeratorForIndexRange_Abstract<TSource, TSource[]>
             {
                 //constructor
@@ -1440,6 +1448,7 @@ namespace System.Collections.Concurrent
         //We assume the source collection is not being updated concurrently. Otherwise it will break the
         //static partitioning, since each partition operates on the source collection directly, it does
         //not have a local cache of the elements assigned to them.
+        [ThreadSafe]
         private abstract class StaticIndexRangePartition<TSource> : IEnumerator<KeyValuePair<long, TSource>>
         {
             //the start and end position in the source collection for the current partition
@@ -1521,6 +1530,7 @@ namespace System.Collections.Concurrent
         /// Provides customized implementation of SourceCount and CreatePartition
         /// </summary>
         /// <typeparam name="TSource"></typeparam>
+        [ThreadSafe]
         private sealed class StaticIndexRangePartitionerForIList<TSource> : StaticIndexRangePartitioner<TSource, IList<TSource>>
         {
             private readonly IList<TSource> _list;
@@ -1545,6 +1555,7 @@ namespace System.Collections.Concurrent
         /// Provides customized implementation of Current property
         /// </summary>
         /// <typeparam name="TSource"></typeparam>
+        [ThreadSafe]
         private sealed class StaticIndexRangePartitionForIList<TSource> : StaticIndexRangePartition<TSource>
         {
             //the source collection shared by all partitions
@@ -1579,6 +1590,7 @@ namespace System.Collections.Concurrent
         /// Inherits from StaticIndexRangePartitioner
         /// Provides customized implementation of SourceCount and CreatePartition for Array
         /// </summary>
+        [ThreadSafe]
         private sealed class StaticIndexRangePartitionerForArray<TSource> : StaticIndexRangePartitioner<TSource, TSource[]>
         {
             private readonly TSource[] _array;
@@ -1602,6 +1614,7 @@ namespace System.Collections.Concurrent
         /// Inherits from StaticIndexRangePartitioner
         /// Provides customized implementation of SourceCount and CreatePartition
         /// </summary>
+        [ThreadSafe]
         private sealed class StaticIndexRangePartitionForArray<TSource> : StaticIndexRangePartition<TSource>
         {
             //the source collection shared by all partitions
@@ -1636,6 +1649,7 @@ namespace System.Collections.Concurrent
         /// <summary>
         /// A very simple primitive that allows us to share a value across multiple threads.
         /// </summary>
+        [ThreadSafe]
         private sealed class SharedInt
         {
             internal volatile int Value;

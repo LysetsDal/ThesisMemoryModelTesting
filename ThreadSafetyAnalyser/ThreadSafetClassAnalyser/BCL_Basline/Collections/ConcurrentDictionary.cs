@@ -82,7 +82,7 @@ namespace BCL_Basline.Collections;
 /// <typeparam name="TValue">The type of the values in the dictionary.</typeparam>
 [DebuggerTypeProxy(typeof (IDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-// [ThreadSafe]
+[ThreadSafe]
 public class ConcurrentDictionary<TKey, TValue> : 
   IDictionary<TKey, TValue>,
   ICollection<KeyValuePair<TKey, TValue>>,

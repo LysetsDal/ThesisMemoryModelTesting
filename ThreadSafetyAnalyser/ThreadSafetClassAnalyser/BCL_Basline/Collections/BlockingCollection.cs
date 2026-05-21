@@ -79,7 +79,6 @@ namespace System.Collections.Concurrent
     [DebuggerTypeProxy(typeof(BlockingCollectionDebugView<>))]
     [DebuggerDisplay("Count = {Count}, Type = {_collection}")]
     [SuppressMessage("Design", "CA1068:CancellationToken parameters must come last")]
-    [ThreadSafe]
     public class BlockingCollection<T> : IEnumerable<T>, ICollection, IDisposable, IReadOnlyCollection<T>
     {
         private IProducerConsumerCollection<T> _collection;

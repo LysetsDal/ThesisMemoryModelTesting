@@ -1,3 +1,6 @@
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Annotations;
 // ReSharper disable InconsistentNaming
@@ -11,7 +14,7 @@ namespace DummyApp.Src;
 #pragma warning disable CS0414 // Field is assigned but its value is never used
 [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
-// [ThreadSafe]
+[ThreadSafe]
 public class Visibility
 {
     private readonly object _lock = new();
@@ -35,6 +38,16 @@ public class Visibility
     public bool PrivateReadonlyProp { get; } = true;
     
     public byte Slot { get; private set; }
+
+    // Should flag unsafe pub warn
+    private List<int> _collection = new();
+    
+    public int[] ToArray()
+    {
+        // InternalFieldNoLock
+        return _collection.ToArray();
+    }
+    
     
     // Needed so _anotherLock is seen as a lock target
     public void UseAnotherLock()
@@ -75,7 +88,7 @@ public class Visibility
             return _count;
         }
     }
-    
+        
     // Should Flag warnings (inconsistent lock usage) 
     public void SetCountLocked(int count)
     {

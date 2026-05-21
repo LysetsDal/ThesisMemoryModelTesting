@@ -108,17 +108,26 @@ namespace ThreadSafetClassAnalyser.Utils
         
         public static bool IsInsideThreadSafePrimitive(SyntaxNode node, SemanticModel semanticModel)
         {
-            // Walk up the tree to see if this identifier is an argument in a method call
+            // Walk up the tree to locate the closest enclosing invocation
             var invocation = node.Ancestors().OfType<InvocationExpressionSyntax>().FirstOrDefault();
             if (invocation == null) return false;
 
-            var symbol = semanticModel.GetSymbolInfo(invocation).Symbol;
+            var symbol = semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
             if (symbol == null) return false;
 
             var containingTypeName = symbol.ContainingType?.ToDisplayString();
+            var methodName = symbol.Name;
 
-            return containingTypeName == KnownTypes.FullInterlockedName || 
-                   containingTypeName == KnownTypes.FullVolatileName;
+            // 1. Check for standard modern atomic primitives
+            if (containingTypeName == KnownTypes.FullInterlockedName || 
+                containingTypeName == KnownTypes.FullVolatileName)
+            {
+                return true;
+            }
+
+            // 2. Check for legacy framework primitives (Thread.VolatileRead / VolatileWrite)
+            return containingTypeName == KnownTypes.FullThreadName && 
+                   (methodName == KnownTypes.VolatileReadOp || methodName == KnownTypes.VolatileWriteOp);
         }
         
         /// <summary>
@@ -245,7 +254,10 @@ namespace ThreadSafetClassAnalyser.Utils
                 foreach (var reference in methodSymbol.DeclaringSyntaxReferences)
                 {
                     var methodSyntax = reference.GetSyntax();
-                    PopulateAccessesRecursive(methodSyntax, model, accessed, visitedMethods, lockAtCallSite);
+                    
+                    var calleeModel = model.Compilation.GetSemanticModel(methodSyntax.SyntaxTree);
+                    
+                    PopulateAccessesRecursive(methodSyntax, calleeModel, accessed, visitedMethods, lockAtCallSite);
                 }
             }
         }
