@@ -134,7 +134,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             // --- SP001: Check all instance fields for safe publication ---
             foreach (var fieldDecl in classDecl.Members.OfType<FieldDeclarationSyntax>())
             {
-                // Skip static, const, readonly, and volatile fields � they are safely published
+                // Skip static, const, readonly, and volatile fields — they are safely published
                 if (fieldDecl.Modifiers.Any(m =>
                         m.IsKind(SyntaxKind.StaticKeyword) ||
                         m.IsKind(SyntaxKind.ConstKeyword) ||
@@ -148,8 +148,17 @@ namespace ThreadSafetClassAnalyser.Analysers
                     if (fieldSymbol == null || fieldSymbol.IsConst)
                         continue;
 
-                    // Skip fields whose type is immutable � their state cannot change after construction
+                    // Skip fields whose type is immutable — their state cannot change after construction
                     if (IsImmutableType(fieldSymbol.Type))
+                        continue;
+
+                    // Skip fields with an inline initializer (e.g. private List<object> _items = new List<object>();)
+                    // C# guarantees these are executed before the constructor body — safely published.
+                    if (variable.Initializer != null)
+                        continue;
+
+                    // Skip fields assigned in every constructor — safely published before the object is visible.
+                    if (IsFieldAssignedInAllConstructors(fieldSymbol, classDecl, semanticModel))
                         continue;
 
                     context.ReportDiagnostic(Diagnostic.Create(
@@ -158,6 +167,53 @@ namespace ThreadSafetClassAnalyser.Analysers
                         fieldSymbol.Name));
                 }
             }
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="fieldSymbol"/> is definitely assigned in every
+        /// instance constructor of <paramref name="classDecl"/>.
+        /// A field set in all constructors is safely published: no other thread can observe
+        /// the object before at least one constructor has completed.
+        /// </summary>
+        private static bool IsFieldAssignedInAllConstructors(
+            IFieldSymbol fieldSymbol,
+            ClassDeclarationSyntax classDecl,
+            SemanticModel semanticModel)
+        {
+            var instanceCtors = classDecl.Members
+                .OfType<ConstructorDeclarationSyntax>()
+                .Where(c => !c.Modifiers.Any(SyntaxKind.StaticKeyword))
+                .ToList();
+
+            // No explicit constructors — only the implicit default ctor runs, which does not assign the field.
+            if (instanceCtors.Count == 0)
+                return false;
+
+            return instanceCtors.All(ctor => ConstructorAssignsField(ctor, fieldSymbol, semanticModel));
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="ctor"/> contains a direct assignment to <paramref name="fieldSymbol"/>.
+        /// </summary>
+        private static bool ConstructorAssignsField(
+            ConstructorDeclarationSyntax ctor,
+            IFieldSymbol fieldSymbol,
+            SemanticModel semanticModel)
+        {
+            if (ctor.Body == null && ctor.ExpressionBody == null)
+                return false;
+
+            SyntaxNode body = (SyntaxNode)ctor.Body ?? ctor.ExpressionBody;
+
+            return body
+                .DescendantNodes()
+                .OfType<AssignmentExpressionSyntax>()
+                .Any(assignment =>
+                {
+                    // Only care about the left-hand side being our field
+                    var symbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                    return SymbolEqualityComparer.Default.Equals(symbol, fieldSymbol);
+                });
         }
 
         private static void AnalyzeConstructorForVirtualCalls(SyntaxNodeAnalysisContext context)
