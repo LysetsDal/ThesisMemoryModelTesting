@@ -36,7 +36,7 @@ namespace ThreadSafetClassAnalyser.Utils
             }
         }
         
-        private const int MaxAnalysisDepth = 10;
+        private const int MaxAnalysisDepth = 6;
 
         public static bool IsInternallySynchronized(
             IMethodSymbol methodSymbol, 
@@ -68,6 +68,9 @@ namespace ThreadSafetClassAnalyser.Utils
             if (syntaxRef == null) return false;
 
             var syntax = syntaxRef.GetSyntax();
+            
+            // --- FIX: Fetch the semantic model that belongs to this specific target node's syntax tree ---
+            var correctModel = semanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
 
             // 4. Intra-procedural Check
             if (syntax.DescendantNodes().OfType<LockStatementSyntax>().Any())
@@ -77,7 +80,8 @@ namespace ThreadSafetClassAnalyser.Utils
             var invocations = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocations)
             {
-                var invokedSymbol = semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+                // --- FIX: Use correctModel here instead of the caller's semanticModel ---
+                var invokedSymbol = correctModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
                 if (invokedSymbol == null) 
                     continue;
 
@@ -96,8 +100,8 @@ namespace ThreadSafetClassAnalyser.Utils
                     continue; 
                 }
 
-                // RECURSION
-                if (IsInternallySynchronized(invokedSymbol, semanticModel, currentDepth + 1, visited))
+                // RECURSION - Pass the aligned correctModel down the chain
+                if (IsInternallySynchronized(invokedSymbol, correctModel, currentDepth + 1, visited))
                 {
                     return true;
                 }
@@ -130,47 +134,196 @@ namespace ThreadSafetClassAnalyser.Utils
                    (methodName == KnownTypes.VolatileReadOp || methodName == KnownTypes.VolatileWriteOp);
         }
         
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="threadCreation"></param>
-        /// <param name="model"></param>
-        /// <returns></returns>
-        public static Dictionary<ISymbol, AccessInfo> GetAccessedFieldsFromExpression(ObjectCreationExpressionSyntax threadCreation, SemanticModel model)
-        {
-            // Change instantiation to AccessInfo
-            var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
-    
-            var lambda = threadCreation.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
-
-            if (lambda == null) return accessed;
-
-            // Now the types match for this call
-            PopulateAccessesRecursive(
-                lambda, 
-                model,
-                accessed, 
-                new HashSet<ISymbol>(SymbolEqualityComparer.Default),
-                null);
-
-            return accessed;
-        }
-        
         public static Dictionary<ISymbol, AccessInfo> GetAccessedFieldsFromMethod(MethodDeclarationSyntax methodDecl, SemanticModel model)
         {
             var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
-
             if (methodDecl == null) return accessed;
 
-            // Pass the entire method body right into your recursive scanner
+            // --- FIX: Extract the correct SemanticModel matching the file where methodDecl is declared ---
+            var correctModel = model.Compilation.GetSemanticModel(methodDecl.SyntaxTree);
+
+            // Resolve the target class anchor syntax from the ancestral context
+            var classDecl = methodDecl.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+            if (classDecl == null) return accessed;
+            
+            // Use the correctly aligned model to resolve the class symbol safely
+            var classSymbol = correctModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return accessed;
+
             PopulateAccessesRecursive(
                 methodDecl,
-                model,
+                correctModel, // Pass the aligned model context down
                 accessed,
                 new HashSet<ISymbol>(SymbolEqualityComparer.Default),
-                null);
+                null,
+                classSymbol);
 
             return accessed;
+        }
+
+        public static Dictionary<ISymbol, AccessInfo> GetAccessedFieldsFromExpression(ObjectCreationExpressionSyntax threadCreation, SemanticModel model)
+        {
+            var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
+            var lambda = threadCreation.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+            if (lambda == null) return accessed;
+
+            // --- FIX: Align model for expressions as well to prevent nested tree hopping failures ---
+            var correctModel = model.Compilation.GetSemanticModel(threadCreation.SyntaxTree);
+
+            var classDecl = threadCreation.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+            if (classDecl == null) return accessed;
+            
+            var classSymbol = correctModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return accessed;
+
+            PopulateAccessesRecursive(
+                lambda, 
+                correctModel, // Pass the aligned model context down
+                accessed, 
+                new HashSet<ISymbol>(SymbolEqualityComparer.Default),
+                null,
+                classSymbol);
+
+            return accessed;
+        }
+
+        /// <summary>
+        /// Recursively analyzes a syntax node to discover all field and property accesses, 
+        /// stepping into invoked local methods while tracking the active locking context.
+        /// </summary>
+        private static void PopulateAccessesRecursive(
+            SyntaxNode node,
+            SemanticModel model,
+            IDictionary<ISymbol, AccessInfo> accessed,
+            HashSet<ISymbol> visitedMethods,
+            ISymbol currentLockSymbol,
+            INamedTypeSymbol classSymbol) // Added instance purity anchor parameter
+        {
+            // Capture manual lock contexts dynamically when entering a method or accessor root
+            var activeLock = currentLockSymbol;
+            if (node is MethodDeclarationSyntax || node is AccessorDeclarationSyntax)
+            {
+                var manualLock = GetManualLockSymbolIfAny(node, model);
+                if (manualLock != null)
+                {
+                    activeLock = manualLock;
+                }
+            }
+
+            // 1. Manual Scan for Fields/Properties
+            var identifiers = node.DescendantNodes().OfType<IdentifierNameSyntax>();
+            foreach (var id in identifiers)
+            {
+                if (id.Ancestors().OfType<AttributeSyntax>().Any()) 
+                    continue;
+                
+                var info = model.GetSymbolInfo(id);
+                var sym = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
+
+                if (sym == null || (sym.Kind != SymbolKind.Field && sym.Kind != SymbolKind.Property)) 
+                    continue;
+                
+                // If a field is readonly, or a property has no setter, it cannot be raced on.
+                if (sym is IFieldSymbol readonlyField && (readonlyField.IsReadOnly || readonlyField.IsConst)) continue;
+                if (sym is IPropertySymbol prop && (prop.IsReadOnly || prop.SetMethod == null)) continue;
+                
+                // --- ROBUST INSTANCE PURITY GUARD ---
+                // If the field belongs to a thread-isolated local variable instance, skip it entirely
+                if (!IsSharedStateAccess(id, sym, model, classSymbol)) 
+                    continue;
+                // ------------------------------------
+
+                var isWrite = IsWriteAccess(id);
+                
+                // Use the dynamically discovered manual lock if a syntactic ancestor lock is missing
+                var effectiveLock = activeLock ?? LockAssociationUtils.GetFirstAncestorLockFromSymbol(id, model);
+                    
+                var isVolatile = (sym is IFieldSymbol field && field.IsVolatile);
+                var isAtomicCall = IsInsideThreadSafePrimitive(id, model);
+                
+                UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock, isVolatile, isAtomicCall);
+            }
+
+            // 2. Process Invocations (Stepping into methods)
+            var invocations = node.DescendantNodes().OfType<InvocationExpressionSyntax>();
+            foreach (var invocation in invocations)
+            {
+                if (!(model.GetSymbolInfo(invocation).Symbol is IMethodSymbol methodSymbol)) continue;
+                if (!visitedMethods.Add(methodSymbol)) continue;
+
+                // Cascade the active lock symbol context down to callee methods during the jump
+                var lockAtCallSite = activeLock ?? LockAssociationUtils.GetFirstAncestorLockFromSymbol(invocation, model);
+                foreach (var reference in methodSymbol.DeclaringSyntaxReferences)
+                {
+                    var methodSyntax = reference.GetSyntax();
+                    var calleeModel = model.Compilation.GetSemanticModel(methodSyntax.SyntaxTree);
+                    
+                    // Maintain the class target constraint anchor across the recursive hop
+                    PopulateAccessesRecursive(methodSyntax, calleeModel, accessed, visitedMethods, lockAtCallSite, classSymbol);
+                }
+            }
+        }
+        
+        // ============================================================================
+        // CORE PURITY GUARD EXTENSION METHOD ENTRIES
+        // ============================================================================
+
+        /// <summary>
+        /// Validates if an identified field/property symbol represents an active shared state vector 
+        /// (global static or instance-bound member) rather than an isolated local object property.
+        /// </summary>
+        private static bool IsSharedStateAccess(IdentifierNameSyntax id, ISymbol sym, SemanticModel model, INamedTypeSymbol classSymbol)
+        {
+            // Rule 1: Static fields or properties are shared globally across application domains
+            if (sym.IsStatic) return true;
+
+            // Rule 2: Direct member references on this instance or inherited base infrastructure
+            if (IsTargetClassOrBaseType(sym.ContainingType, classSymbol)) return true;
+
+            // Rule 3: Deep nested property chains (e.g. socket.ReceiveTimeout).
+            // Walk up to trace the base receiver token expression layout.
+            SyntaxNode current = id;
+            while (current.Parent is MemberAccessExpressionSyntax memberAccess && memberAccess.Name == current)
+            {
+                var receiverExpr = memberAccess.Expression;
+                var receiverInfo = model.GetSymbolInfo(receiverExpr);
+                var receiverSymbol = receiverInfo.Symbol ?? receiverInfo.CandidateSymbols.FirstOrDefault();
+
+                if (receiverSymbol != null)
+                {
+                    // If the left-hand receiver is a member variable of our target type layout, it's shared state!
+                    if (IsTargetClassOrBaseType(receiverSymbol.ContainingType, classSymbol)) return true;
+                    if (receiverSymbol.IsStatic) return true;
+
+                    // If the receiver is an intervening nested member object property/field, continue walking up the chain
+                    if (receiverSymbol.Kind == SymbolKind.Field || receiverSymbol.Kind == SymbolKind.Property)
+                    {
+                        current = receiverExpr;
+                        continue;
+                    }
+                }
+                break;
+            }
+
+            return false;
+        }
+        
+        /// <summary>
+        /// Traverses inheritance lines recursively to verify symbol declaration ancestry matches the type under review.
+        /// </summary>
+        private static bool IsTargetClassOrBaseType(INamedTypeSymbol declarationType, INamedTypeSymbol anchor)
+        {
+            if (declarationType == null || anchor == null) return false;
+            
+            var currentTypeContext = anchor;
+            while (currentTypeContext != null)
+            {
+                if (SymbolEqualityComparer.Default.Equals(declarationType, currentTypeContext))
+                    return true;
+                
+                currentTypeContext = currentTypeContext.BaseType;
+            }
+            return false;
         }
 
         /// <summary>
