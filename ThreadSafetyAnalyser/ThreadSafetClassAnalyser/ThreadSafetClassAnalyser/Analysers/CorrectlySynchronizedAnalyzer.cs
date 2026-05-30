@@ -57,20 +57,16 @@ namespace ThreadSafetClassAnalyser.Analysers
             context.RegisterSyntaxNodeAction(AnalyzeMonitorUsage, SyntaxKind.ClassDeclaration);
         }
         
-        // =============================================================
-        // ============== LOCKING ON THE 'THIS' INSTANCE ===============
-        // =============================================================
         private static void AnalyzeLockThis(SyntaxNodeAnalysisContext context)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node;
             var semanticModel = context.SemanticModel;
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
 
-            // 1. Guard: Only run if the class is annotated with [ThreadSafe]
+            // Only run if the class is annotated with [ThreadSafe]
             if (classSymbol == null || !ThreadSafeValidator.ShouldValidateTarget(classSymbol)) 
                 return;
-
-            // 2. Use utility to find all locks and their associations
+            
             var lockMap = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
 
             foreach (var associations in lockMap.Values)
@@ -97,7 +93,7 @@ namespace ThreadSafetClassAnalyser.Analysers
 
                     if (!isLockThis) continue;
                     
-                    // 3. Extract the name of the method/member containing the lock
+                    // Extract the name of the method/member containing the lock
                     // We use your existing GetBodyName helper for consistent naming
                     var enclosingMemberNode = lockStmt.Ancestors()
                         .FirstOrDefault(a => a is MemberDeclarationSyntax || a is AccessorDeclarationSyntax);
@@ -109,23 +105,20 @@ namespace ThreadSafetClassAnalyser.Analysers
                     context.ReportDiagnostic(Diagnostic.Create(
                         CorrectlySynchronizedRules.LockOnClassInstanceRule,
                         lockStmt.Expression.GetLocation(),
-                        classSymbol.Name,  // {0}
-                        displayMethodName                   // {1}
+                        classSymbol.Name,
+                        displayMethodName
                     ));
                 }
             }
         }
         
-        // =============================================================
-        // ========= POSSIBLE VOLATILE STORE LOAD REORDERING ===========
-        // =============================================================
         private static void AnalyzeVolatileReordering(SyntaxNodeAnalysisContext context)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node;
             var semanticModel = context.SemanticModel;
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
 
-            // Guard: Only run if the class is annotated with [ThreadSafe]
+            // Only run if the class is annotated with [ThreadSafe]
             if (classSymbol == null || !ThreadSafeValidator.ShouldValidateTarget(classSymbol)) 
                  return;
 
@@ -137,7 +130,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             {
                 var methodName = SyntaxUtils.GetBodyName(body);
 
-                // 1. Establish Program Order (PO) within this specific method/lambda body 
+                // Establish Program Order (PO) within this specific method/lambda body 
                 var identifiers = body.DescendantNodes().OfType<IdentifierNameSyntax>().ToList();
 
                 for (var i = 0; i < identifiers.Count; i++)
@@ -145,7 +138,7 @@ namespace ThreadSafetClassAnalyser.Analysers
                     var idWrite = identifiers[i];
                     var writeSymbol = semanticModel.GetSymbolInfo(idWrite).Symbol as IFieldSymbol;
 
-                    // Step: Filter for Volatile Write
+                    // Filter for Volatile Write
                     if (writeSymbol == null || !writeSymbol.IsVolatile || !AnalyzerUtils.IsWriteAccess(idWrite))
                         continue;
 
@@ -154,21 +147,21 @@ namespace ThreadSafetClassAnalyser.Analysers
                         var idRead = identifiers[j];
                         var readSymbol = semanticModel.GetSymbolInfo(idRead).Symbol as IFieldSymbol;
 
-                        // Step: Identify Volatile Read occurring later in PO 
+                        // Identify Volatile Read occurring later in PO 
                         if (readSymbol == null || !readSymbol.IsVolatile || AnalyzerUtils.IsWriteAccess(idRead))
                             continue;
 
-                        // GUARD: Skip if the volatile read is executed inside a lock statement
+                        // Skip if the volatile read is executed inside a lock statement
                         // OR inside a Monitor.Enter/TryEnter-guarded try block (manual lock pattern)
                         if (LockAssociationUtils.GetEnclosingLockSymbol(idRead, semanticModel) != null
                             || AnalyzerUtils.IsInsideMonitorEnterRegion(idRead, semanticModel))
                             continue;
                         
-                        // 2. Check for Full Fences (Intervening synchronization) 
+                        // Check for Full Fences (Intervening synchronization) 
                         // We pass 'body' as the root to check for barriers between the write and read
                         if (!AnalyzerUtils.HasFullFenceBetween(body, idWrite, idRead, semanticModel))
                         {
-                            // 3. Flag Total Order Violation
+                            // Flag Total Order Violation
                             context.ReportDiagnostic(Diagnostic.Create(
                                 CorrectlySynchronizedRules.VolatileReorderingRule,
                                 idRead.GetLocation(),
@@ -181,10 +174,6 @@ namespace ThreadSafetClassAnalyser.Analysers
             }
         }
         
-        
-        // =============================================================
-        // ========= CONFLICTING ACCESSES IN TASKS AND THREADS =========
-        // =============================================================
         private static void AnalyzeConflictingAccessesInThreads(SyntaxNodeAnalysisContext context)
         {
             AnalyzeConflictingAccessesInClass(context, KnownTypes.Thread);
@@ -233,7 +222,7 @@ namespace ThreadSafetClassAnalyser.Analysers
                 };
             }).Where(t => t.BodySymbol != null).ToList();
             
-            // 4. Compare every thread against every other thread 
+            // Compare every thread against every other thread 
             for (var i = 0; i < analyzedThreads.Count; i++)
             {
                 for (var j = i + 1; j < analyzedThreads.Count; j++)
@@ -244,7 +233,7 @@ namespace ThreadSafetClassAnalyser.Analysers
                     // Filter by Method Scope (Only sibling threads)
                     if (t1.MethodScope != t2.MethodScope) continue;
 
-                    // Macro-check: Do they share a common lock at the top level?
+                    // Do they share a common lock at the top level?
                     if (t1.UsedLockObjects
                         .Intersect(t2.UsedLockObjects, SymbolEqualityComparer.Default).Any())
                         continue;
@@ -254,10 +243,9 @@ namespace ThreadSafetClassAnalyser.Analysers
 
                     foreach (var conflict in conflicts)
                     {
-                        // Micro-check: Is this specific field protected by the same lock?
                         var info1 = t1.AccessMap[conflict];
                         var info2 = t2.AccessMap[conflict];
-
+                        
                         if (AnalyzerUtils.IsUsingSameLockObject(info1, info2)) continue;
                         
                         ReportThreadConflict(context, t1, t2, conflict.Name);
@@ -283,9 +271,6 @@ namespace ThreadSafetClassAnalyser.Analysers
                 fieldName, t2.Name, t1.Name));
         }
         
-        // =====================================================
-        // ============= CONFLICTING ACCESS TEST ===============
-        // =====================================================
         private static void AnalyzeConflictingAccessesAcrossMembers(SyntaxNodeAnalysisContext context)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node;
@@ -297,7 +282,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             // Guard for the [ThreadSafe] annotation
             if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
 
-            // 1. Collect all instance methods written in this class (skip static methods)
+            // Collect all instance methods written in this class (skip static methods)
             var methodDeclarations = classDecl.Members
                 .OfType<MethodDeclarationSyntax>()
                 .Where(m => !m.Modifiers.Any(SyntaxKind.StaticKeyword))
@@ -306,10 +291,10 @@ namespace ThreadSafetClassAnalyser.Analysers
 
             if (methodDeclarations.Count < 2) return;
 
-            // 2. Map out all the class locks
+            // Map out all the class locks
             var classLocks = LockAssociationUtils.GetClassLocks(classSymbol, semanticModel);
 
-            // 3. A list of all members (methods) in the class 
+            // A list of all members (methods) in the class 
             var analyzedMembers = methodDeclarations.Select(methodDecl =>
             {
                 var methodSymbol = semanticModel.GetDeclaredSymbol(methodDecl);
@@ -338,7 +323,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             // A set of distinct conflicts (MethodName, sharedState)
             var reportedConflicts = new HashSet<(MethodDeclarationSyntax Method, ISymbol Field)>();
 
-            // 4. Pairwise comparison matrix (Compare every method against every other member)
+            // Pairwise comparison matrix (Compare every method against every other member)
             for (var i = 0; i < analyzedMembers.Count; i++)
             {
                 for (var j = i + 1; j < analyzedMembers.Count; j++)
@@ -346,7 +331,6 @@ namespace ThreadSafetClassAnalyser.Analysers
                     var m1 = analyzedMembers[i];
                     var m2 = analyzedMembers[j];
                     
-                    // IMPROVEMENT: Avoid flagging wrapper methods
                     // If one method symbol is found inside the other's syntax tree, skip the comparison
                     if (m1.Syntax.DescendantNodes().OfType<InvocationExpressionSyntax>()
                         .Any(inv => SymbolEqualityComparer.Default.Equals(semanticModel.GetSymbolInfo(inv).Symbol, m2.Symbol))) continue;
@@ -364,7 +348,7 @@ namespace ThreadSafetClassAnalyser.Analysers
                         var info1 = m1.AccessMap[conflict];
                         var info2 = m2.AccessMap[conflict];
 
-                        // If both sides are just reading the data, it is completely thread-safe!
+                        // If both sides are just reading the data, it's safe
                         if (info1.AccessType == AccessType.Read && info2.AccessType == AccessType.Read) 
                         {
                             continue;
@@ -380,17 +364,18 @@ namespace ThreadSafetClassAnalyser.Analysers
                         // Check for Correctly Synchronized 
                         if (protectedByLock || protectedByAtomics) continue;
 
+                        var postfix = $"{m1.Name}(): {info1.AccessType}, {m2.Name}(): {info2.AccessType}";
                         
                         // Only flag Method 1 if it hasn't been warned about this specific field yet
                         if (reportedConflicts.Add((m1.Syntax, conflict)))
                         {
-                            ReportSingleMemberConflict(context, m1.Syntax, m1.Name, m2.Name, conflict.Name);
+                            ReportSingleMemberConflict(context, m1.Syntax, m1.Name, m2.Name, conflict.Name, postfix);
                         }
                 
                         // Only flag Method 2 if it hasn't been warned about this specific field yet
                         if (reportedConflicts.Add((m2.Syntax, conflict)))
                         {
-                            ReportSingleMemberConflict(context, m2.Syntax, m2.Name, m1.Name, conflict.Name);
+                            ReportSingleMemberConflict(context, m2.Syntax, m2.Name, m1.Name, conflict.Name, postfix);
                         }
                     }
                 }
@@ -402,24 +387,22 @@ namespace ThreadSafetClassAnalyser.Analysers
             MethodDeclarationSyntax methodSyntax, 
             string methodName, 
             string conflictingMethodName, 
-            string fieldName)
+            string fieldName,
+            string accessPostfix)
         {
             context.ReportDiagnostic(Diagnostic.Create(
                 CorrectlySynchronizedRules.ConflictingAccessRule,
                 methodSyntax.Identifier.GetLocation(),
-                fieldName, methodName, conflictingMethodName));
+                fieldName, methodName, conflictingMethodName, accessPostfix));
         }
-
-        // =============================================================
-        // ============== MONITOR ENTER / EXIT USAGE ===================
-        // =============================================================
+        
         private static void AnalyzeMonitorUsage(SyntaxNodeAnalysisContext context)
         {
             var classDecl = (ClassDeclarationSyntax)context.Node;
             var semanticModel = context.SemanticModel;
             var classSymbol = semanticModel.GetDeclaredSymbol(classDecl);
 
-            // Guard: Only run if the class is annotated with [ThreadSafe]
+            // Only run if the class is annotated with [ThreadSafe]
             if (classSymbol == null || !ThreadSafeValidator.ShouldValidateTarget(classSymbol))
                 return;
 
@@ -457,7 +440,7 @@ namespace ThreadSafetClassAnalyser.Analysers
 
                 foreach (var enterCall in enterCalls)
                 {
-                    // GUARD: Monitor.Enter(obj, ref lockTaken) is the intentional cross-method pairing
+                    // Monitor.Enter(obj, ref lockTaken) is the intentional cross-method pairing
                     // pattern. Enter and Exit will be in different methods by design — skip lifetime checks.
                     var isManualLifetimePattern = enterCall.ArgumentList.Arguments.Count >= 2;
                     if (isManualLifetimePattern) continue;
@@ -486,8 +469,8 @@ namespace ThreadSafetClassAnalyser.Analysers
                         context.ReportDiagnostic(Diagnostic.Create(
                             CorrectlySynchronizedRules.MonitorNotPairedRule,
                             enterCall.GetLocation(),
-                            methodName,     // {0}
-                            lockObjName));  // {1}
+                            methodName, 
+                            lockObjName));
                     }
 
                     // --- Rule: MonitorNotInFinally ---
@@ -500,8 +483,8 @@ namespace ThreadSafetClassAnalyser.Analysers
                         context.ReportDiagnostic(Diagnostic.Create(
                             CorrectlySynchronizedRules.MonitorNotInFinallyRule,
                             enterCall.GetLocation(),
-                            methodName,     // {0}
-                            lockObjName));  // {1}
+                            methodName, 
+                            lockObjName));
                     }
 
                     // --- Rule: MonitorConflictingAccess ---
@@ -509,9 +492,9 @@ namespace ThreadSafetClassAnalyser.Analysers
                     context.ReportDiagnostic(Diagnostic.Create(
                         CorrectlySynchronizedRules.MonitorConflictingAccessRule,
                         enterCall.GetLocation(),
-                        lockObjName,    // {0}
-                        methodName,     // {1}
-                        "?"));          // {2} — conflicting method, TBD in next iteration
+                        lockObjName,
+                        methodName,
+                        "?"));
                 }
             }
         }

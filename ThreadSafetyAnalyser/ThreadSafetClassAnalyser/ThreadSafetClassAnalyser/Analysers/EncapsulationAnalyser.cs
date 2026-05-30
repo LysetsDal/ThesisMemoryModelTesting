@@ -134,13 +134,13 @@ namespace ThreadSafetClassAnalyser.Analysers
             var symbol = context.SemanticModel.GetSymbolInfo(memberAccess.Name).Symbol;
             if (symbol is null) return;
             
-            // // Guard: Only run if context class is annotated with: [ThreadSafe]
+            // Only run if context class is annotated with: [ThreadSafe]
             if (!ThreadSafeValidator.ShouldValidate(context)) return;
             
-            // // Guard: Only run if annotated with: [ThreadSafe]
+            // Only run if annotated with: [ThreadSafe]
             if (!ThreadSafeValidator.ShouldValidateTarget(symbol)) return;
 
-            // Guard: Only care about mutable fields and props (i.e. not readonly or const)
+            // Only care about mutable fields and props (i.e. not readonly or const)
             if (!SyntaxUtils.IsMutableFieldOrProperty(symbol)) return;
             
             var isInSource = symbol.Locations.FirstOrDefault().IsInSource;
@@ -149,10 +149,10 @@ namespace ThreadSafetClassAnalyser.Analysers
             var containingType = symbol.ContainingType;
             var accessContainingType = context.ContainingSymbol?.ContainingType;
 
-            // Guard: Skip members in Enums
+            // Skip members in Enums
             if (containingType?.TypeKind == TypeKind.Enum) return;
             
-            // Guard: Skip if Field or Prop accessor uses a lock
+            // Skip if Field or Prop accessor uses a lock
             var descendantLock = LockAssociationUtils.FindFirstDescendantLockFromMethodSymbol(symbol);
             if (descendantLock != null) return;
             
@@ -242,7 +242,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             var classDecl = context.Node.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
             if (classDecl == null) return;
 
-            // 1. Identify all symbols declared by this node (Handles multiple fields or single property)
+            // Identify all symbols declared by this node (Handles multiple fields or single property)
             var symbolsToAnalyze = new List<ISymbol>();
 
             if (context.Node is FieldDeclarationSyntax fieldDecl)
@@ -264,22 +264,26 @@ namespace ThreadSafetClassAnalyser.Analysers
 
             if (symbolsToAnalyze.Count == 0) return;
             
-            // 2. Run analysis for each identified symbol
+            // Run analysis for each identified symbol
             foreach (var memberSymbol in symbolsToAnalyze)
             {
                 // Check if the declaration is readonly
-                var isInherentlyReadOnly = false;
+                ITypeSymbol memberType = null;
+                var isModifierReadOnly = false;
                 if (memberSymbol is IFieldSymbol field)
                 {
-                    isInherentlyReadOnly = field.IsReadOnly;
+                    isModifierReadOnly = field.IsReadOnly;
+                    memberType = field.Type;
                 }
                 else if (memberSymbol is IPropertySymbol prop)
                 {
-                    isInherentlyReadOnly = prop.IsReadOnly || prop.SetMethod == null;
+                    isModifierReadOnly = prop.IsReadOnly || prop.SetMethod == null;
+                    memberType = prop.Type;
                 }
 
-                // If it's read-only, it's inherently thread-safe to read outside constructors.
-                // We can skip collecting and analyzing usages entirely!
+                // If it's read-only, it's thread-safe to read outside constructors.
+                // We can skip collecting and analyzing usages
+                var isInherentlyReadOnly = isModifierReadOnly && SyntaxUtils.IsTypeThreadSafeWhenReadOnly(memberType);
                 if (isInherentlyReadOnly) continue;
                 
                 // Collect all usages of this specific field/property in the class
@@ -354,7 +358,7 @@ namespace ThreadSafetClassAnalyser.Analysers
         {
             var fieldDecl = (FieldDeclarationSyntax)context.Node;
             
-            // Guard Clause: Only run if annotated with: [ThreadSafe]
+            // Only run if annotated with: [ThreadSafe]
             if (!ThreadSafeValidator.ShouldValidate(context)) return;
             
             // Rule does not apply to Interfaces, Records or Structs
@@ -390,7 +394,7 @@ namespace ThreadSafetClassAnalyser.Analysers
         // -------------------------------------------------------------------------
         private static void AnalyzePublicPropertyDeclaration(SyntaxNodeAnalysisContext context)
         {
-            // Guard Clause: Only run if annotated with: [ThreadSafe]
+            // Only run if annotated with: [ThreadSafe]
             if (!ThreadSafeValidator.ShouldValidate(context)) return;
 
             var propDecl = (PropertyDeclarationSyntax)context.Node;
@@ -401,7 +405,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             // Only care about public properties (intersection of private)
             if (propDecl.Modifiers.Any(SyntaxKind.PrivateKeyword)) return;
 
-            // expression-bodied property — read-only by nature, skip
+            // Expression-bodied property is read-only by nature, skip
             if (propDecl.AccessorList == null) return; 
 
             var accessors = propDecl.AccessorList.Accessors;

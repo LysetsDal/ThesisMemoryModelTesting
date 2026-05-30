@@ -262,7 +262,7 @@
     <value>Multiple class members access the same mutable field concurrently without a shared lock, where at least one operation is a write. This can introduce data races and memory reordering bugs</value>
   </data>
   <data name="ConflictingAccessRuleMessageFormat" xml:space="preserve">
-    <value>Method '{1}()' can conflict with method '{2}()' on the shared state '{0}' because they lack proper synchronization and at least one method is a write operation.</value>
+    <value>Method '{1}()' can conflict with method '{2}()' on the shared state '{0}' because they lack proper synchronization and at least one method is a write operation ({3}).</value>
   </data>
   <data name="MonitorNotPairedTitle" xml:space="preserve">
     <value>Unpaired Monitor.Enter call</value>

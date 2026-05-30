@@ -230,7 +230,7 @@ namespace ThreadSafetClassAnalyser.Analysers
 
             if (!ThreadSafeValidator.ShouldValidateTarget(classSymbol)) return;
 
-            if (classSymbol == null || classSymbol.IsSealed)
+            if (classSymbol.IsSealed)
                 return; // sealed class: no derived class can override, safe
 
             // Guard: constructor may have no body (e.g. extern or expression-bodied)
@@ -296,7 +296,7 @@ namespace ThreadSafetClassAnalyser.Analysers
             if (namedType.IsRecord)
                 return true;
 
-            // Per the Microsoft definition � a type is immutable if it has:
+            // Per the Microsoft definition a type is immutable if it has:
             //   - No public properties or fields, OR
             //   - Only read-only properties (no setter), OR
             //   - Only init-only setters on properties

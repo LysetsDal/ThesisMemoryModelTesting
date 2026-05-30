@@ -44,7 +44,7 @@ namespace ThreadSafetClassAnalyser.Utils
             int currentDepth = 0, 
             HashSet<IMethodSymbol> visited = null)
         {
-            // 1. Terminal cases & Performance Guards
+            // Terminal cases & Performance Guards
             if (methodSymbol == null || currentDepth > MaxAnalysisDepth) return false;
             
             if (visited == null)
@@ -53,8 +53,7 @@ namespace ThreadSafetClassAnalyser.Utils
             }
 
             if (!visited.Add(methodSymbol)) return false;
-
-            // 2. Metadata Check: Include SemaphoreSlim as an inherently safe system primitive
+            
             var typeName = methodSymbol.ContainingType?.ToDisplayString();
             if (typeName == KnownTypes.FullInterlockedName || 
                 typeName == KnownTypes.FullVolatileName || 
@@ -69,23 +68,21 @@ namespace ThreadSafetClassAnalyser.Utils
 
             var syntax = syntaxRef.GetSyntax();
             
-            // --- FIX: Fetch the semantic model that belongs to this specific target node's syntax tree ---
+            // Fetch the semantic model that belongs to this specific target node's syntax tree
             var correctModel = semanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
-
-            // 4. Intra-procedural Check
+            
             if (syntax.DescendantNodes().OfType<LockStatementSyntax>().Any())
                 return true;
-
-            // 5. Inter-procedural Check
+            
             var invocations = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocations)
             {
-                // --- FIX: Use correctModel here instead of the caller's semanticModel ---
+                // Use correctModel here instead of the caller's semanticModel
                 var invokedSymbol = correctModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
                 if (invokedSymbol == null) 
                     continue;
 
-                // Optimization: Only step into calls within the same class boundary
+                // Only step into calls within the same class boundary
                 if (!SymbolEqualityComparer.Default.Equals(invokedSymbol.ContainingType, methodSymbol.ContainingType))
                 {
                     var extTypeName = invokedSymbol.ContainingType?.ToDisplayString();
@@ -100,7 +97,7 @@ namespace ThreadSafetClassAnalyser.Utils
                     continue; 
                 }
 
-                // RECURSION - Pass the aligned correctModel down the chain
+                // Pass the aligned correctModel down the chain
                 if (IsInternallySynchronized(invokedSymbol, correctModel, currentDepth + 1, visited))
                 {
                     return true;
@@ -122,14 +119,14 @@ namespace ThreadSafetClassAnalyser.Utils
             var containingTypeName = symbol.ContainingType?.ToDisplayString();
             var methodName = symbol.Name;
 
-            // 1. Check for standard modern atomic primitives
+            // Check for standard modern atomic primitives
             if (containingTypeName == KnownTypes.FullInterlockedName || 
                 containingTypeName == KnownTypes.FullVolatileName)
             {
                 return true;
             }
 
-            // 2. Check for legacy framework primitives (Thread.VolatileRead / VolatileWrite)
+            // Check for legacy framework primitives (Thread.VolatileRead / VolatileWrite)
             return containingTypeName == KnownTypes.FullThreadName && 
                    (methodName == KnownTypes.VolatileReadOp || methodName == KnownTypes.VolatileWriteOp);
         }
@@ -139,7 +136,7 @@ namespace ThreadSafetClassAnalyser.Utils
             var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
             if (methodDecl == null) return accessed;
 
-            // --- FIX: Extract the correct SemanticModel matching the file where methodDecl is declared ---
+            // Extract the correct SemanticModel matching the file where methodDecl is declared 
             var correctModel = model.Compilation.GetSemanticModel(methodDecl.SyntaxTree);
 
             // Resolve the target class anchor syntax from the ancestral context
@@ -167,7 +164,7 @@ namespace ThreadSafetClassAnalyser.Utils
             var lambda = threadCreation.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
             if (lambda == null) return accessed;
 
-            // --- FIX: Align model for expressions as well to prevent nested tree hopping failures ---
+            // Align model for expressions as well to prevent nested tree hopping failures
             var correctModel = model.Compilation.GetSemanticModel(threadCreation.SyntaxTree);
 
             var classDecl = threadCreation.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
@@ -197,7 +194,7 @@ namespace ThreadSafetClassAnalyser.Utils
             IDictionary<ISymbol, AccessInfo> accessed,
             HashSet<ISymbol> visitedMethods,
             ISymbol currentLockSymbol,
-            INamedTypeSymbol classSymbol) // Added instance purity anchor parameter
+            INamedTypeSymbol classSymbol)
         {
             // Capture manual lock contexts dynamically when entering a method or accessor root
             var activeLock = currentLockSymbol;
@@ -209,8 +206,7 @@ namespace ThreadSafetClassAnalyser.Utils
                     activeLock = manualLock;
                 }
             }
-
-            // 1. Manual Scan for Fields/Properties
+            
             var identifiers = node.DescendantNodes().OfType<IdentifierNameSyntax>();
             foreach (var id in identifiers)
             {
@@ -227,7 +223,6 @@ namespace ThreadSafetClassAnalyser.Utils
                 if (sym is IFieldSymbol readonlyField && (readonlyField.IsReadOnly || readonlyField.IsConst)) continue;
                 if (sym is IPropertySymbol prop && (prop.IsReadOnly || prop.SetMethod == null)) continue;
                 
-                // --- ROBUST INSTANCE PURITY GUARD ---
                 // If the field belongs to a thread-isolated local variable instance, skip it entirely
                 if (!IsSharedStateAccess(id, sym, model, classSymbol)) 
                     continue;
@@ -235,7 +230,7 @@ namespace ThreadSafetClassAnalyser.Utils
 
                 var isWrite = IsWriteAccess(id);
                 
-                // Use the dynamically discovered manual lock if a syntactic ancestor lock is missing
+                // Use the dynamically discovered manual lock if an ancestor lock is missing
                 var effectiveLock = activeLock ?? LockAssociationUtils.GetFirstAncestorLockFromSymbol(id, model);
                     
                 var isVolatile = (sym is IFieldSymbol field && field.IsVolatile);
@@ -244,7 +239,7 @@ namespace ThreadSafetClassAnalyser.Utils
                 UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock, isVolatile, isAtomicCall);
             }
 
-            // 2. Process Invocations (Stepping into methods)
+            // Process Invocations (Stepping into methods)
             var invocations = node.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocations)
             {
@@ -350,7 +345,7 @@ namespace ThreadSafetClassAnalyser.Utils
             while (current.Parent is MemberAccessExpressionSyntax || current.Parent is ElementAccessExpressionSyntax)
             {
                 // If the identifier is inside bracket arguments (e.g. arr[field]) or a parenthesized
-                // expression, the field is only being read � not written.
+                // expression, the field is only being read, not written.
                 if (current.Parent is ElementAccessExpressionSyntax elementAccess && elementAccess.Expression != current)
                     return false;
 
@@ -361,19 +356,19 @@ namespace ThreadSafetClassAnalyser.Utils
             }
 
             // If the walked-up expression is itself an element access (e.g. _array[i] = val),
-            // the field is only read to obtain the collection reference � not written.
+            // the field is only read to obtain the collection reference not written.
             if (current is ElementAccessExpressionSyntax)
                 return false;
 
             var parent = current.Parent;
 
-            // 1. Check for assignment: current = value;
+            // Check for assignment: current = value;
             if (parent is AssignmentExpressionSyntax assignment && assignment.Left == current)
             {
                 return true;
             }
 
-            // 2. Check for increment/decrement: current++;
+            // Check for increment/decrement: current++;
             return parent is PostfixUnaryExpressionSyntax || parent is PrefixUnaryExpressionSyntax;
         }
 
@@ -442,7 +437,7 @@ namespace ThreadSafetClassAnalyser.Utils
                 var info1 = method1AccessMap[field];
                 
                 
-                // 1. Basic conflict check (at least one write)
+                // Basic conflict check (at least one write)
                 if (info1.AccessType == AccessType.Write || info2.AccessType == AccessType.Write)
                 {
                     yield return field;
@@ -500,19 +495,17 @@ namespace ThreadSafetClassAnalyser.Utils
                     {
                         var containingType = symbol.ContainingType.ToDisplayString();
                         var methodName = symbol.Name;
-
-                        // Thread.MemoryBarrier() � explicit full fence
+                        
                         if (containingType == KnownTypes.FullThreadName && methodName == KnownTypes.MemoryBarrier)
                             return true;
 
-                        // Interlocked.* � no read or write can move past an interlocked operation in either direction
+                        // Interlocked.* no read or write can move past an interlocked operation in either direction
                         // Covers: Exchange, CompareExchange, Add, Increment, Decrement, Read, Or, And
-                        // https://learn.microsoft.com/en-us/archive/msdn-magazine/2005/october/understanding-low-lock-techniques-in-multithreaded-apps
                         if (containingType == KnownTypes.FullInterlockedName)
                             return true;
 
-                        // Monitor.Enter / Monitor.TryEnter � acquire fence
-                        // Monitor.Exit � release fence
+                        // Monitor.Enter / Monitor.TryEnter (acquire fence)
+                        // Monitor.Exit (release fence)
                         // Together (or individually between a write and read) they act as a full fence
                         if (containingType == KnownTypes.FullMonitorName &&
                             (methodName == "Enter" || methodName == "Exit" || methodName == "TryEnter"))
@@ -520,7 +513,7 @@ namespace ThreadSafetClassAnalyser.Utils
                     }
                 }
 
-                // lock statement � full fence on both entry (acquire) and exit (release)
+                // lock statement full fence on both entry (acquire) and exit (release)
                 // Syntactic sugar over Monitor.Enter / Monitor.Exit
                 if (node is LockStatementSyntax)
                     return true;
@@ -550,7 +543,7 @@ namespace ThreadSafetClassAnalyser.Utils
         
         /// <summary>
         /// Returns <see langword="true"/> if <paramref name="node"/> is protected by the
-        /// <c>Monitor.Enter</c> / <c>Monitor.Exit</c> manual-lock pattern � i.e. a
+        /// <c>Monitor.Enter</c> / <c>Monitor.Exit</c> manual-lock pattern i.e. a
         /// <c>Monitor.Enter</c> call precedes it in the method body, and it is enclosed
         /// in a try/finally whose finally block calls <c>Monitor.Exit</c>.
         /// </summary>
@@ -592,7 +585,7 @@ namespace ThreadSafetClassAnalyser.Utils
 
         /// <summary>
         /// Returns <see langword="true"/> if the given finally clause contains a
-        /// <c>Monitor.Exit</c> call � indicating a manually managed lock release.
+        /// <c>Monitor.Exit</c> call indicating a manually managed lock release.
         /// </summary>
         private static bool HasMonitorExitInFinally(FinallyClauseSyntax finallyClause, SemanticModel model)
         {

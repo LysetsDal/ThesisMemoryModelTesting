@@ -48,6 +48,21 @@ namespace ThreadSafetClassAnalyser.Utils
             return false;
         }
         
+        public static bool IsTypeThreadSafeWhenReadOnly(ITypeSymbol type)
+        {
+            if (type == null) return false;
+
+            // Primitives, enums, and strings are inherently safe to read if the field is readonly
+            if (type.IsValueType || type.SpecialType == SpecialType.System_String)
+                return true;
+
+            // Check for known immutable collections
+            if (type.Name.StartsWith("Immutable") && type.ContainingNamespace?.ToDisplayString() == "System.Collections.Immutable")
+                return true;
+            
+            return false;
+        }
+        
         public static bool IsMethodPrivate(IMethodSymbol method)
         {
             if (method == null)
