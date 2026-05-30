@@ -1,5 +1,36 @@
+using System.Collections.Generic;
+using System.Linq;
 using Annotations;
 using DummyApp.Model;
+// ReSharper disable HeuristicUnreachableCode
+// ReSharper disable UnusedType.Global
+// ReSharper disable RedundantExtendsListEntry
+// ReSharper disable SuggestVarOrType_SimpleTypes
+// ReSharper disable InconsistentNaming
+// ReSharper disable ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+// ReSharper disable CheckNamespace
+// ReSharper disable ConditionIsAlwaysTrueOrFalse
+// ReSharper disable RedundantCast
+// ReSharper disable InlineOutVariableDeclaration
+// ReSharper disable SuggestVarOrType_Elsewhere
+// ReSharper disable ConvertToUsingDeclaration
+// ReSharper disable SuggestVarOrType_BuiltInTypes
+// ReSharper disable InvertIf
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable ArrangeThisQualifier
+// ReSharper disable RedundantNameQualifier
+// ReSharper disable ArrangeDefaultValueWhenTypeNotEvident
+// ReSharper disable RedundantTypeArgumentsOfMethod
+// ReSharper disable RedundantAssignment
+// ReSharper disable FieldCanBeMadeReadOnly.Local
+// ReSharper disable UseCollectionExpression
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedMember.Local
+// ReSharper disable NotAccessedField.Local
+#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+#pragma warning disable CS8603 // Possible null reference return.
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
 
 namespace DummyApp.Src;
 
@@ -9,9 +40,7 @@ namespace DummyApp.Src;
 // [ThreadSafe]
 public class ComplexClass
 {
-    
     private readonly object _lock = new();
-    private readonly object _lock2 = new();
     
     private List<AuditEvent> _events = new(); 
     
@@ -68,16 +97,17 @@ public class ComplexClass
     }
     
     private AuditEvent _clientSend;
-    private readonly object _lockerSend = new object();
+    private readonly object _lockerSend = new ();
     private AuditEvent _clientReceive;
-    private readonly object _lockerReceive = new object();
+    private readonly object _lockerReceive = new ();
     private int resSend;
     private int resReceive;
     
+    // Should flag warning ConflictingAccessRule 
     public AuditEvent GetSendClient()
     {
-        // lock (_lockerSend)
-        // {
+        lock (_lockerSend)
+        {
             if (_clientSend == null)
             {
                 _clientSend = new AuditEvent();
@@ -86,13 +116,15 @@ public class ComplexClass
                     resSend = _clientSend.Duration;
                 }
             }
-        // }
+        }
         return _clientSend;
+        // Should flag InternalFieldNoLock warning
     }
     
+    // Should flag warning ConflictingAccessRule 
     private AuditEvent GetReceiveClient()
     {
-        lock (_lockerReceive)
+        lock (_lockerSend)
         {
             if (_clientReceive == null)
             {

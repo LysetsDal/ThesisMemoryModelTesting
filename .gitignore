@@ -68,3 +68,7 @@ target/
 #IDEs
 .idea/
 .DS_Store
+
+ThreadSafetyAnalyser/ThreadSafetClassAnalyser/.sarif
+.sarif
+**/.sarif/

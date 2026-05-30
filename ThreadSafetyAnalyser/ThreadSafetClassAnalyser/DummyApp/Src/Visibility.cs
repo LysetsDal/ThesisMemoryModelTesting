@@ -1,32 +1,53 @@
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Annotations;
+// ReSharper disable InconsistentNaming
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable ConvertToConstant.Global
+// ReSharper disable ConvertToConstant.Local
+// ReSharper disable CheckNamespace
 
 namespace DummyApp.Src;
 
 #pragma warning disable CS0414 // Field is assigned but its value is never used
 [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
 
-// [ThreadSafe]
+[ThreadSafe]
 public class Visibility
 {
     private readonly object _lock = new();
     private readonly object _anotherLock = new();
     
+    // Should flag PublicFieldExposed warning
     public int _transactions = 0;
+    // Should flag PublicFieldExposed warning
     public readonly int _transactionReadOnly = 1;
     
     private int _count = 0;
     private readonly int _countReadOnly = 1;
     
-    
+    // Should flag PublicFieldExposed warning
     public bool PublicFieldBreakingEncapsulation = true;
     private bool _privateFieldBreakingEncapsulation = false;
     
+    // Should flag PublicFieldExposed warning
     public bool PublicPropBreakingEncapsulation { get; set; }
     private bool PrivatePropBreakingEncapsulation { get; set; }
     public bool PrivateReadonlyProp { get; } = true;
     
     public byte Slot { get; private set; }
+
+    // Should flag unsafe pub warn
+    private List<int> _collection = new();
+    
+    public int[] ToArray()
+    {
+        // InternalFieldNoLock
+        return _collection.ToArray();
+    }
+    
     
     // Needed so _anotherLock is seen as a lock target
     public void UseAnotherLock()
@@ -44,11 +65,17 @@ public class Visibility
     {
         get
         {
-            lock (_lock) return _count;
+            lock (_lock)
+            {
+                return _count;
+            }
         }
         set
         {
-            lock (_lock) _count = value;
+            lock (_lock)
+            {
+                _count = value;
+            } 
         }
     }
 
@@ -57,10 +84,11 @@ public class Visibility
     {
         lock (_lock)
         {
+            // Should flag InconsistentLockUse warning
             return _count;
         }
     }
-    
+        
     // Should Flag warnings (inconsistent lock usage) 
     public void SetCountLocked(int count)
     {
@@ -68,15 +96,15 @@ public class Visibility
             _count = count;
     }
     
-    // Should Flag warnings (no lock usage) 
     public int GetCount()
     { 
+        // Should flag InternalFieldNoLock warning
         return _count;
     }
     
-    // Should Flag warnings (no lock usage) 
     public void SetCount(int count)
     {
+        // Should flag InternalFieldNoLock warning
         _count = count;
     }   
     
@@ -86,20 +114,21 @@ public class Visibility
         return _countReadOnly;
     }
     
-    // Should Flag warnings
     public int GetTransactions()
     { 
+        // Should flag InternalFieldNoLock warning
         return _transactions;
     }
     
     public void SetTransactions(int count)
     {
+        // Should flag InternalFieldNoLock warning
         _transactions = count;
     }
     
-    // Should Flag warnings (returns sync obj)
     public object GetSyncObject()
     {
+        // Should flag LockObjectExposed warning
         return _anotherLock;
     }
     

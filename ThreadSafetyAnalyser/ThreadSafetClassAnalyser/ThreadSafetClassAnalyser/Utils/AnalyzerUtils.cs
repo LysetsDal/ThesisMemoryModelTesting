@@ -1,242 +1,15 @@
-using System.Collections.Generic;
-using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using System.Collections.Generic;
 using System.Linq;
 using ThreadSafetClassAnalyser.Model;
-using System;
-
 
 namespace ThreadSafetClassAnalyser.Utils
 {
     public static class AnalyzerUtils
     {
-        /// <summary>
-        /// Helper method that determines if a field, prop or other member belongs to a class.
-        /// </summary>
-        /// <param name="ctx">
-        /// The current context from a Syntax Node 
-        /// </param>
-        public static bool IsFieldOrPropParentAClass(SyntaxNodeAnalysisContext ctx)
-        {
-            // ContainingSymbol refers to the field/property itself
-            // ContainingType refers to the class/struct/interface it lives in
-            var containingType = ctx.ContainingSymbol?.ContainingType;
-            
-            return containingType != null && containingType.TypeKind == TypeKind.Class;
-        }
-        
-        /// <summary>
-        /// Determines if the current analysis context is within a class marked with [ThreadSafe].
-        /// Used for methods registered with 'RegisterSyntaxNodeAction()' in the Initialize method.
-        /// </summary>
-        /// <param name="context">A SyntaxNodeAnalysisContext</param>
-        public static bool IsInThreadSafeClass(SyntaxNodeAnalysisContext context)
-        {
-            // For syntax actions, the ContainingSymbol's type is the class
-            var classSymbol = context.ContainingSymbol?.ContainingType;
-            return GetThreadSafeAttribute(classSymbol) != null;
-        }
-
-        /// <summary>
-        /// Determines if the current symbol analysis context is for a class marked with [ThreadSafe].
-        /// Used for methods registered with 'RegisterSymbolAction()' and 'SymbolKind.NamedType' in the Initialize method.
-        /// </summary>
-        /// <param name="context">A SymbolAnalysisContext</param>
-        public static bool IsInThreadSafeClass(SymbolAnalysisContext context)
-        {
-            // For symbol actions, the Symbol itself is often the class (NamedType)
-            // var classSymbol = context.Symbol as INamedTypeSymbol ?? context.Symbol.ContainingType;
-            return GetThreadSafeAttribute(context.Symbol) != null;
-        }
-        
-        /// <summary>
-        /// Checks if the target of a member access belongs to a [ThreadSafe] class.
-        /// Should be used for call-site warnings to check if the target class is annotated.
-        /// </summary>
-        public static bool IsTargetInThreadSafeClass(ISymbol targetSymbol)
-        {
-            return GetThreadSafeAttribute(targetSymbol) != null;
-        }
-        
-        /// <summary>
-        /// Checks if a symbol's containing type (i.e. the class) is annotated with the [ThreadSafe] attribute.
-        /// </summary>
-        /// <param name="symbol">The symbol to inspect.</param>
-        /// <returns>The AttributeData if found, otherwise null.</returns>
-        private static AttributeData GetThreadSafeAttribute(ISymbol symbol)
-        {
-            if (symbol == null) return null;
-
-            // If it's the class itself (INamedTypeSymbol), use it.
-            // If it's a field/method, use the ContainingType.
-            var typeToInspect = symbol as INamedTypeSymbol ?? symbol.ContainingType;
-
-            return typeToInspect?.GetAttributes().FirstOrDefault(attr =>
-            {
-                var displayString = attr.AttributeClass?.ToDisplayString();
-                
-                return displayString == KnownTypes.ThreadSafe || 
-                       attr.AttributeClass?.Name == KnownTypes.ThreadSafeShort ||
-                       attr.AttributeClass?.Name == "ThreadSafe";
-            });
-        }
-
-        /// <summary>
-        /// Gets the first variable in a field declaration.
-        /// </summary>
-        /// <param name="fieldDecl"> The field declaration you want to get a variable name from</param>
-        /// <returns> A variable declaration syntax context </returns>
-        /// <remarks> If multiple symbol names are given (i.e. int a, b;) it will return the first one.</remarks>
-        public static VariableDeclaratorSyntax GetFirstVariableInFieldDeclaration(FieldDeclarationSyntax fieldDecl)
-        {
-            return fieldDecl.Declaration.Variables.FirstOrDefault();
-        }
-        
-        /// <summary>
-        /// Returns a dictionary of Locks, and a LockAssociation list of all members where this lock is used as a target (e.g. lock($target) { ... } )
-        /// </summary>
-        /// <param name="classSymbol">The Symbol of the class to find locks in</param>
-        /// <param name="semanticModel">The Semantic model of the classSymbol</param>
-        /// <returns>A dictionary of [Key: LockSymbols, Value: <see cref="LockAssociation"/>]</returns>
-        public static ImmutableDictionary<ISymbol, ImmutableArray<LockAssociation>> 
-            GetClassLockAssociationDict(
-                INamedTypeSymbol classSymbol,
-                Compilation compilation
-                )
-        {
-            // Use the custom LockAssociation struct instead of Tuple
-            var lockMapping = new Dictionary<ISymbol, List<LockAssociation>>(SymbolEqualityComparer.Default);
-            
-            foreach (var location in classSymbol.DeclaringSyntaxReferences)
-            {
-                var classSyntax = location.GetSyntax() as ClassDeclarationSyntax;
-                if (classSyntax == null) continue;
-
-                var semanticModel = compilation.GetSemanticModel(classSyntax.SyntaxTree);
-
-                // Find every lock statement inside this class (handles partial classes via DeclaringSyntaxReferences)
-                var allLocks = classSyntax.DescendantNodes().OfType<LockStatementSyntax>();
-
-                foreach (var lockStmt in allLocks)
-                {
-                    // Determine WHAT is being locked (the expression inside the parentheses)
-                    ISymbol lockObjSymbol;
-                    try
-                    {
-                        lockObjSymbol = semanticModel.GetSymbolInfo(lockStmt.Expression).Symbol;
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        var lockExprText   = lockStmt.Expression.ToString();
-                        var lockLocation   = lockStmt.GetLocation();
-                        var syntaxTreePath = lockStmt.SyntaxTree.FilePath;
-                        var modelTreePath  = semanticModel.SyntaxTree.FilePath;
-                        var treeMatch      = lockStmt.SyntaxTree == semanticModel.SyntaxTree;
-
-                        throw new InvalidOperationException(
-                            $@"
-                            [GetClassLockAssociationDict] SemanticModel/SyntaxTree mismatch while resolving lock expression.
-                            
-                              Class       : {classSymbol.ToDisplayString()}
-                              Lock expr   : {lockExprText}
-                              Lock at     : {lockLocation.GetLineSpan()}
-                              Node tree   : {syntaxTreePath}
-                              Model tree  : {modelTreePath}
-                              Trees match : {treeMatch}
-                            ", ex);
-                    }
-
-                    if (lockObjSymbol == null) continue;
-
-                    
-                    // Determine the Enclosing Member (Method, Property Accessor, Constructor, etc.)
-                    var enclosingMember = lockStmt.Ancestors()
-                        .FirstOrDefault(a => 
-                            a is MemberDeclarationSyntax || 
-                            a is AccessorDeclarationSyntax || 
-                            a is LambdaExpressionSyntax);
-
-                    
-                    // Get the Symbol for the member containing the lock
-                    ISymbol memberSymbol = null;
-                    if (enclosingMember != null)
-                    {
-                        if (enclosingMember is LambdaExpressionSyntax lambda)
-                        {
-                            // 2. For Lambdas, use GetSymbolInfo to get the anonymous method symbol
-                            memberSymbol = semanticModel.GetSymbolInfo(lambda).Symbol;
-                        }
-                        else
-                        {
-                            // 3. For standard members, use GetDeclaredSymbol
-                            memberSymbol = semanticModel.GetDeclaredSymbol(enclosingMember);
-                        }
-                    }
-                    
-
-                    
-                    if (!lockMapping.ContainsKey(lockObjSymbol))
-                    {
-                        lockMapping[lockObjSymbol] = new List<LockAssociation>();
-                    }
-                    
-                    lockMapping[lockObjSymbol].Add(new LockAssociation(memberSymbol, lockStmt));
-                }
-            }
-            
-            // Convert the dictionary to an immutable version for safe analyzer use
-            return lockMapping.ToImmutableDictionary(
-                kvp => kvp.Key, 
-                kvp => kvp.Value.ToImmutableArray(), 
-                SymbolEqualityComparer.Default);
-        }
-        
-        /// <summary>
-        /// Looks at a method and returns the first lock it finds inside the method. Single layer, doesn't recurse.
-        /// </summary>
-        /// <param name="methodSymbol"></param>
-        /// <returns></returns>
-        public static LockStatementSyntax FindFirstDescendantLockFromMethodSymbol(ISymbol methodSymbol)
-        {
-            var containingMethodSyntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
-
-            LockStatementSyntax parentLock = null;
-            if (containingMethodSyntaxRef == null) return parentLock;
-            var methodDecl = containingMethodSyntaxRef.GetSyntax();
-            parentLock = methodDecl.DescendantNodes()
-                .OfType<LockStatementSyntax>()
-                .FirstOrDefault();
-
-            return parentLock;
-        }
-        
-        /// <summary>
-        /// Searches upwards through the syntax tree from the specified node to find the 
-        /// nearest enclosing <see cref="LockStatementSyntax"/>. If found, it retrieves 
-        /// the symbol of the object used as the lock target.
-        /// </summary>
-        /// <param name="node">The syntax node from which to begin searching upwards.</param>
-        /// <param name="model">The semantic model used to resolve the symbol of the lock expression.</param>
-        /// <returns>
-        /// The <see cref="ISymbol"/> representing the object being locked e.g. 'object _lock = new()', 
-        /// or <c>null</c> if the node is not contained within a lock statement or the symbol cannot be resolved.
-        /// </returns>
-        public static ISymbol GetFirstAncestorLockFromSymbol(SyntaxNode node, SemanticModel model)
-        {
-            var lockStmt = node
-                .Ancestors()
-                .OfType<LockStatementSyntax>()
-                .FirstOrDefault();
-            
-            if (lockStmt == null) return null;
-
-            // Get the symbol of what is being locked (e.g., _syncObj)
-            return model.GetSymbolInfo(lockStmt.Expression).Symbol;
-        }
-        
         /// <summary>
         /// Searches the class lock associations to find which lock objects (targets) 
         /// are being used inside a specific member (method, lambda, etc.).
@@ -245,7 +18,7 @@ namespace ThreadSafetClassAnalyser.Utils
         /// <param name="memberSymbol">The symbol of the method or lambda to check.</param>
         /// <returns>A list of symbols representing the objects being locked.</returns>
         public static IEnumerable<ISymbol> GetLockObjectsUsedInMember(
-            ImmutableDictionary<ISymbol, ImmutableArray<LockAssociation>> lockMap, 
+            ClassLocks lockMap, 
             ISymbol memberSymbol)
         {
             if (memberSymbol == null) yield break;
@@ -263,136 +36,408 @@ namespace ThreadSafetClassAnalyser.Utils
             }
         }
         
-        public static ISymbol GetEnclosingLockSymbol(SyntaxNode node, SemanticModel model)
-        {
-            var lockStatement = node.Ancestors().OfType<LockStatementSyntax>().FirstOrDefault();
-            if (lockStatement == null) return null;
+        private const int MaxAnalysisDepth = 6;
 
-            return model.GetSymbolInfo(lockStatement.Expression).Symbol;
+        public static bool IsInternallySynchronized(
+            IMethodSymbol methodSymbol, 
+            SemanticModel semanticModel, 
+            int currentDepth = 0, 
+            HashSet<IMethodSymbol> visited = null)
+        {
+            // Terminal cases & Performance Guards
+            if (methodSymbol == null || currentDepth > MaxAnalysisDepth) return false;
+            
+            if (visited == null)
+            {
+                visited = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
+            }
+
+            if (!visited.Add(methodSymbol)) return false;
+            
+            var typeName = methodSymbol.ContainingType?.ToDisplayString();
+            if (typeName == KnownTypes.FullInterlockedName || 
+                typeName == KnownTypes.FullVolatileName || 
+                typeName == KnownTypes.FullMonitorName ||
+                typeName == KnownTypes.FullSemaphoreSlimName)
+            {
+                return true;
+            }
+
+            var syntaxRef = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault();
+            if (syntaxRef == null) return false;
+
+            var syntax = syntaxRef.GetSyntax();
+            
+            // Fetch the semantic model that belongs to this specific target node's syntax tree
+            var correctModel = semanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
+            
+            if (syntax.DescendantNodes().OfType<LockStatementSyntax>().Any())
+                return true;
+            
+            var invocations = syntax.DescendantNodes().OfType<InvocationExpressionSyntax>();
+            foreach (var invocation in invocations)
+            {
+                // Use correctModel here instead of the caller's semanticModel
+                var invokedSymbol = correctModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+                if (invokedSymbol == null) 
+                    continue;
+
+                // Only step into calls within the same class boundary
+                if (!SymbolEqualityComparer.Default.Equals(invokedSymbol.ContainingType, methodSymbol.ContainingType))
+                {
+                    var extTypeName = invokedSymbol.ContainingType?.ToDisplayString();
+                    // Match external calls against the expanded primitive list
+                    if (extTypeName == KnownTypes.FullInterlockedName || 
+                        extTypeName == KnownTypes.FullVolatileName || 
+                        extTypeName == KnownTypes.FullMonitorName ||
+                        extTypeName == KnownTypes.FullSemaphoreSlimName)
+                    {
+                        return true;
+                    }
+                    continue; 
+                }
+
+                // Pass the aligned correctModel down the chain
+                if (IsInternallySynchronized(invokedSymbol, correctModel, currentDepth + 1, visited))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         
-        
-        // ========================================================================================
-        // =========================== CORRECTLY SYNCHRONIZED ANALYSER ============================
-        // ========================================================================================
-        public static Dictionary<ISymbol, AccessInfo> GetAccessedFields(ObjectCreationExpressionSyntax threadCreation, SemanticModel model)
+        public static bool IsInsideThreadSafePrimitive(SyntaxNode node, SemanticModel semanticModel)
         {
-            // Change instantiation to AccessInfo
+            // Walk up the tree to locate the closest enclosing invocation
+            var invocation = node.Ancestors().OfType<InvocationExpressionSyntax>().FirstOrDefault();
+            if (invocation == null) return false;
+
+            var symbol = semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+            if (symbol == null) return false;
+
+            var containingTypeName = symbol.ContainingType?.ToDisplayString();
+            var methodName = symbol.Name;
+
+            // Check for standard modern atomic primitives
+            if (containingTypeName == KnownTypes.FullInterlockedName || 
+                containingTypeName == KnownTypes.FullVolatileName)
+            {
+                return true;
+            }
+
+            // Check for legacy framework primitives (Thread.VolatileRead / VolatileWrite)
+            return containingTypeName == KnownTypes.FullThreadName && 
+                   (methodName == KnownTypes.VolatileReadOp || methodName == KnownTypes.VolatileWriteOp);
+        }
+        
+        public static Dictionary<ISymbol, AccessInfo> GetAccessedFieldsFromMethod(MethodDeclarationSyntax methodDecl, SemanticModel model)
+        {
             var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
-    
-            var lambda = threadCreation.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+            if (methodDecl == null) return accessed;
 
-            if (lambda == null) return accessed;
+            // Extract the correct SemanticModel matching the file where methodDecl is declared 
+            var correctModel = model.Compilation.GetSemanticModel(methodDecl.SyntaxTree);
 
-            // Now the types match for this call
+            // Resolve the target class anchor syntax from the ancestral context
+            var classDecl = methodDecl.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+            if (classDecl == null) return accessed;
+            
+            // Use the correctly aligned model to resolve the class symbol safely
+            var classSymbol = correctModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return accessed;
+
             PopulateAccessesRecursive(
-                lambda, 
-                model, 
-                accessed, 
+                methodDecl,
+                correctModel, // Pass the aligned model context down
+                accessed,
                 new HashSet<ISymbol>(SymbolEqualityComparer.Default),
-                null);
+                null,
+                classSymbol);
 
             return accessed;
         }
 
-        public static void PopulateAccessesRecursive(
-            SyntaxNode node,
-            SemanticModel model, 
-            IDictionary<ISymbol, AccessInfo> accessed, 
-            HashSet<ISymbol> visitedMethods,
-            ISymbol currentLockSymbol)
+        public static Dictionary<ISymbol, AccessInfo> GetAccessedFieldsFromExpression(ObjectCreationExpressionSyntax threadCreation, SemanticModel model)
         {
-            // 1. Manual Scan for Fields/Properties
+            var accessed = new Dictionary<ISymbol, AccessInfo>(SymbolEqualityComparer.Default);
+            var lambda = threadCreation.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+            if (lambda == null) return accessed;
+
+            // Align model for expressions as well to prevent nested tree hopping failures
+            var correctModel = model.Compilation.GetSemanticModel(threadCreation.SyntaxTree);
+
+            var classDecl = threadCreation.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+            if (classDecl == null) return accessed;
+            
+            var classSymbol = correctModel.GetDeclaredSymbol(classDecl);
+            if (classSymbol == null) return accessed;
+
+            PopulateAccessesRecursive(
+                lambda, 
+                correctModel, // Pass the aligned model context down
+                accessed, 
+                new HashSet<ISymbol>(SymbolEqualityComparer.Default),
+                null,
+                classSymbol);
+
+            return accessed;
+        }
+
+        /// <summary>
+        /// Recursively analyzes a syntax node to discover all field and property accesses, 
+        /// stepping into invoked local methods while tracking the active locking context.
+        /// </summary>
+        private static void PopulateAccessesRecursive(
+            SyntaxNode node,
+            SemanticModel model,
+            IDictionary<ISymbol, AccessInfo> accessed,
+            HashSet<ISymbol> visitedMethods,
+            ISymbol currentLockSymbol,
+            INamedTypeSymbol classSymbol)
+        {
+            // Capture manual lock contexts dynamically when entering a method or accessor root
+            var activeLock = currentLockSymbol;
+            if (node is MethodDeclarationSyntax || node is AccessorDeclarationSyntax)
+            {
+                var manualLock = GetManualLockSymbolIfAny(node, model);
+                if (manualLock != null)
+                {
+                    activeLock = manualLock;
+                }
+            }
+            
             var identifiers = node.DescendantNodes().OfType<IdentifierNameSyntax>();
             foreach (var id in identifiers)
             {
+                if (id.Ancestors().OfType<AttributeSyntax>().Any()) 
+                    continue;
+                
                 var info = model.GetSymbolInfo(id);
                 var sym = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
 
-                if (sym == null ||
-                    (sym.Kind != SymbolKind.Field && sym.Kind != SymbolKind.Property)) continue;
+                if (sym == null || (sym.Kind != SymbolKind.Field && sym.Kind != SymbolKind.Property)) 
+                    continue;
                 
-                // Determine if it's a write by checking if it's on the left side of an assignment
+                // If a field is readonly, or a property has no setter, it cannot be raced on.
+                if (sym is IFieldSymbol readonlyField && (readonlyField.IsReadOnly || readonlyField.IsConst)) continue;
+                if (sym is IPropertySymbol prop && (prop.IsReadOnly || prop.SetMethod == null)) continue;
+                
+                // If the field belongs to a thread-isolated local variable instance, skip it entirely
+                if (!IsSharedStateAccess(id, sym, model, classSymbol)) 
+                    continue;
+                // ------------------------------------
+
                 var isWrite = IsWriteAccess(id);
-                var effectiveLock = currentLockSymbol ?? GetFirstAncestorLockFromSymbol(id, model);
+                
+                // Use the dynamically discovered manual lock if an ancestor lock is missing
+                var effectiveLock = activeLock ?? LockAssociationUtils.GetFirstAncestorLockFromSymbol(id, model);
                     
-                UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock);
+                var isVolatile = (sym is IFieldSymbol field && field.IsVolatile);
+                var isAtomicCall = IsInsideThreadSafePrimitive(id, model);
+                
+                UpdateAccessMap(accessed, sym, isWrite ? AccessType.Write : AccessType.Read, effectiveLock, isVolatile, isAtomicCall);
             }
 
-            // 2. Process Invocations (Stepping into methods)
+            // Process Invocations (Stepping into methods)
             var invocations = node.DescendantNodes().OfType<InvocationExpressionSyntax>();
             foreach (var invocation in invocations)
             {
                 if (!(model.GetSymbolInfo(invocation).Symbol is IMethodSymbol methodSymbol)) continue;
                 if (!visitedMethods.Add(methodSymbol)) continue;
 
-                // Check if THIS specific call is wrapped in a lock before jumping
-                var lockAtCallSite = currentLockSymbol ?? GetFirstAncestorLockFromSymbol(invocation, model);
-
+                // Cascade the active lock symbol context down to callee methods during the jump
+                var lockAtCallSite = activeLock ?? LockAssociationUtils.GetFirstAncestorLockFromSymbol(invocation, model);
                 foreach (var reference in methodSymbol.DeclaringSyntaxReferences)
                 {
                     var methodSyntax = reference.GetSyntax();
-                    // Pass the current lock state down into the method body
-                    PopulateAccessesRecursive(methodSyntax, model, accessed, visitedMethods, lockAtCallSite);
+                    var calleeModel = model.Compilation.GetSemanticModel(methodSyntax.SyntaxTree);
+                    
+                    // Maintain the class target constraint anchor across the recursive hop
+                    PopulateAccessesRecursive(methodSyntax, calleeModel, accessed, visitedMethods, lockAtCallSite, classSymbol);
                 }
             }
         }
+        
+        // ============================================================================
+        // CORE PURITY GUARD EXTENSION METHOD ENTRIES
+        // ============================================================================
 
+        /// <summary>
+        /// Validates if an identified field/property symbol represents an active shared state vector 
+        /// (global static or instance-bound member) rather than an isolated local object property.
+        /// </summary>
+        private static bool IsSharedStateAccess(IdentifierNameSyntax id, ISymbol sym, SemanticModel model, INamedTypeSymbol classSymbol)
+        {
+            // Rule 1: Static fields or properties are shared globally across application domains
+            if (sym.IsStatic) return true;
+
+            // Rule 2: Direct member references on this instance or inherited base infrastructure
+            if (IsTargetClassOrBaseType(sym.ContainingType, classSymbol)) return true;
+
+            // Rule 3: Deep nested property chains (e.g. socket.ReceiveTimeout).
+            // Walk up to trace the base receiver token expression layout.
+            SyntaxNode current = id;
+            while (current.Parent is MemberAccessExpressionSyntax memberAccess && memberAccess.Name == current)
+            {
+                var receiverExpr = memberAccess.Expression;
+                var receiverInfo = model.GetSymbolInfo(receiverExpr);
+                var receiverSymbol = receiverInfo.Symbol ?? receiverInfo.CandidateSymbols.FirstOrDefault();
+
+                if (receiverSymbol != null)
+                {
+                    // If the left-hand receiver is a member variable of our target type layout, it's shared state!
+                    if (IsTargetClassOrBaseType(receiverSymbol.ContainingType, classSymbol)) return true;
+                    if (receiverSymbol.IsStatic) return true;
+
+                    // If the receiver is an intervening nested member object property/field, continue walking up the chain
+                    if (receiverSymbol.Kind == SymbolKind.Field || receiverSymbol.Kind == SymbolKind.Property)
+                    {
+                        current = receiverExpr;
+                        continue;
+                    }
+                }
+                break;
+            }
+
+            return false;
+        }
+        
+        /// <summary>
+        /// Traverses inheritance lines recursively to verify symbol declaration ancestry matches the type under review.
+        /// </summary>
+        private static bool IsTargetClassOrBaseType(INamedTypeSymbol declarationType, INamedTypeSymbol anchor)
+        {
+            if (declarationType == null || anchor == null) return false;
+            
+            var currentTypeContext = anchor;
+            while (currentTypeContext != null)
+            {
+                if (SymbolEqualityComparer.Default.Equals(declarationType, currentTypeContext))
+                    return true;
+                
+                currentTypeContext = currentTypeContext.BaseType;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Determines whether a given <see cref="IdentifierNameSyntax"/> represents a write operation (mutation) to a variable.
+        /// </summary>
+        /// <param name="identifier">The identifier token to evaluate.</param>
+        /// <returns>
+        /// <see langword="true"/> if the identifier is the target of an assignment expression or part of a unary 
+        /// increment/decrement operation; otherwise, <see langword="false"/>.
+        /// </returns>
+        /// <remarks>
+        /// This method walks up the syntax tree to resolve complex member or element accesses 
+        /// (e.g., tracing <c>obj.NestedProperty.Field</c> up to its assignment context) before 
+        /// checking for mutating expressions like <c>=</c>, <c>+=</c>, <c>++</c>, or <c>--</c>.
+        /// Note: if the identifier resolves to an element access (e.g. <c>arr[i] = val</c>) or a
+        /// parenthesized expression on the left-hand side, it is treated as a read � only the element
+        /// is written, not the field itself.
+        /// </remarks>
         public static bool IsWriteAccess(IdentifierNameSyntax identifier)
         {
             SyntaxNode current = identifier;
 
-            // Walk up through member accesses (obj.Field) or element accesses (arr[i])
-            // to find the full expression being assigned to.
+            // Walk up through member accesses (obj.Field) to find the full expression being assigned to.
             while (current.Parent is MemberAccessExpressionSyntax || current.Parent is ElementAccessExpressionSyntax)
             {
+                // If the identifier is inside bracket arguments (e.g. arr[field]) or a parenthesized
+                // expression, the field is only being read, not written.
+                if (current.Parent is ElementAccessExpressionSyntax elementAccess && elementAccess.Expression != current)
+                    return false;
+
+                if (current.Parent is ParenthesizedExpressionSyntax)
+                    return false;
+
                 current = current.Parent;
             }
 
+            // If the walked-up expression is itself an element access (e.g. _array[i] = val),
+            // the field is only read to obtain the collection reference not written.
+            if (current is ElementAccessExpressionSyntax)
+                return false;
+
             var parent = current.Parent;
 
-            // 1. Check for assignment: current = value;
+            // Check for assignment: current = value;
             if (parent is AssignmentExpressionSyntax assignment && assignment.Left == current)
             {
                 return true;
             }
 
-            // 2. Check for increment/decrement: current++;
-            if (parent is PostfixUnaryExpressionSyntax || parent is PrefixUnaryExpressionSyntax)
-            {
-                return true;
-            }
-
-            return false;
+            // Check for increment/decrement: current++;
+            return parent is PostfixUnaryExpressionSyntax || parent is PrefixUnaryExpressionSyntax;
         }
 
-        private static void UpdateAccessMap(IDictionary<ISymbol, AccessInfo> map, ISymbol symbol, AccessType type, ISymbol currentLock)
+        /// <summary>
+        /// Updates or initializes the access tracking record for a specific shared symbol and its locking strategy.
+        /// </summary>
+        /// <param name="map">The state map correlating symbols with their aggregated <see cref="AccessInfo"/>.</param>
+        /// <param name="symbol">The field or property symbol being accessed.</param>
+        /// <param name="type">The type of access detected (<see cref="AccessType.Read"/> or <see cref="AccessType.Write"/>).</param>
+        /// <param name="currentLock">The symbol representing the lock object protecting this specific access, or <see langword="null"/>.</param>
+        /// <param name="isVolatile">The symbol is a volatile type</param>
+        /// <param name="isAtomicCall">Uses Interlocked to call</param>
+        /// <remarks>
+        /// <b>Lock Poisoning Logic:</b> If a symbol is accessed multiple times across different code paths, 
+        /// its attributes are aggregated. A <see cref="AccessType.Write"/> will permanently overwrite a <see cref="AccessType.Read"/>. 
+        /// Crucially, if the symbol is accessed under two <i>different</i> locks (or locked in one place but unlocked in another), 
+        /// the <see cref="AccessInfo.LockObject"/> is permanently set to <see langword="null"/>, indicating inconsistent synchronization.
+        /// </remarks>
+        private static void UpdateAccessMap(
+            IDictionary<ISymbol, AccessInfo> map, 
+            ISymbol symbol, 
+            AccessType type, 
+            ISymbol currentLock,
+            bool isVolatile,
+            bool isAtomicCall)
         {
             if (map.TryGetValue(symbol, out var existing))
             {
                 if (type == AccessType.Write) existing.AccessType = AccessType.Write;
-                
+        
+                // If one access is locked and another isn't, LockObject becomes null (inconsistent)
                 if (!SymbolEqualityComparer.Default.Equals(existing.LockObject, currentLock))
                 {
                     existing.LockObject = null; 
                 }
+        
+                // Accumulate atomic properties
+                existing.IsVolatile |= isVolatile;
+                existing.IsAtomicCall |= isAtomicCall;
             }
             else
             {
-                map[symbol] = new AccessInfo { AccessType = type, LockObject = currentLock };
+                map[symbol] = new AccessInfo 
+                { 
+                    AccessType = type, 
+                    LockObject = currentLock,
+                    IsVolatile = isVolatile,
+                    IsAtomicCall = isAtomicCall
+                };
             }
         }
 
+        /// <summary>
+        /// This method finds conflicting accesses between two Symbols and their field & property accesses.
+        /// </summary>
+        /// <param name="method1AccessMap">A Dict associating Symbols with <see cref="AccessInfo"/> access entries from the method</param>
+        /// <param name="method2AccessMap">A Dict associating Symbols with <see cref="AccessInfo"/> access entries from the method</param>
+        /// <returns>A list of symbols that have conflicting accesses where at least one is a write operation</returns>
         public static IEnumerable<ISymbol> FindConflicts(
-            Dictionary<ISymbol, AccessInfo> t1, 
-            Dictionary<ISymbol, AccessInfo> t2)
+            Dictionary<ISymbol, AccessInfo> method1AccessMap, 
+            Dictionary<ISymbol, AccessInfo> method2AccessMap)
         {
-            foreach (var field in t1.Keys)
+            foreach (var field in method1AccessMap.Keys)
             {
-                if (!t2.TryGetValue(field, out var info2)) continue;
-                var info1 = t1[field];
-
-                // 1. Basic conflict check (at least one write)
+                if (!method2AccessMap.TryGetValue(field, out var info2)) continue;
+                var info1 = method1AccessMap[field];
+                
+                
+                // Basic conflict check (at least one write)
                 if (info1.AccessType == AccessType.Write || info2.AccessType == AccessType.Write)
                 {
                     yield return field;
@@ -420,6 +465,17 @@ namespace ThreadSafetClassAnalyser.Utils
                 .ToList();
         }
         
+        /// <summary>
+        /// Determines whether a full memory fence (barrier) exists between two syntax nodes in program order.
+        /// </summary>
+        /// <param name="root">The root node of the syntax tree to search within.</param>
+        /// <param name="start">The starting syntax node (typically a write operation).</param>
+        /// <param name="end">The ending syntax node (typically a read operation).</param>
+        /// <param name="model">The semantic model used to resolve symbols for method invocations.</param>
+        /// <returns>
+        /// True if a full memory fence is detected between <paramref name="start"/> 
+        /// and <paramref name="end"/>; otherwise false.
+        /// </returns>
         public static bool HasFullFenceBetween(SyntaxNode root, SyntaxNode start, SyntaxNode end, SemanticModel model)
         {
             var startPos = start.SpanStart;
@@ -431,56 +487,187 @@ namespace ThreadSafetClassAnalyser.Utils
 
             foreach (var node in nodesInBetween)
             {
-                // Check for Thread.MemoryBarrier() [cite: 240]
+                // Check for Thread.MemoryBarrier()
                 if (node is InvocationExpressionSyntax invocation)
                 {
                     var symbol = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
                     if (symbol != null)
                     {
                         var containingType = symbol.ContainingType.ToDisplayString();
-                        // Barriers: Thread.MemoryBarrier, Interlocked operations, or entering a lock
-                        if (containingType == "System.Threading.Thread" && symbol.Name == "MemoryBarrier") return true;
-                        if (containingType == "System.Threading.Interlocked") return true;
+                        var methodName = symbol.Name;
+                        
+                        if (containingType == KnownTypes.FullThreadName && methodName == KnownTypes.MemoryBarrier)
+                            return true;
+
+                        // Interlocked.* no read or write can move past an interlocked operation in either direction
+                        // Covers: Exchange, CompareExchange, Add, Increment, Decrement, Read, Or, And
+                        if (containingType == KnownTypes.FullInterlockedName)
+                            return true;
+
+                        // Monitor.Enter / Monitor.TryEnter (acquire fence)
+                        // Monitor.Exit (release fence)
+                        // Together (or individually between a write and read) they act as a full fence
+                        if (containingType == KnownTypes.FullMonitorName &&
+                            (methodName == "Enter" || methodName == "Exit" || methodName == "TryEnter"))
+                            return true;
                     }
                 }
 
-                // Check for lock statements (Full fence on entry/exit) [cite: 159, 200]
-                if (node is LockStatementSyntax) return true;
+                // lock statement full fence on both entry (acquire) and exit (release)
+                // Syntactic sugar over Monitor.Enter / Monitor.Exit
+                if (node is LockStatementSyntax)
+                    return true;
             }
 
             return false;
         }
         
         /// <summary>
-        /// Helper to resolve a name for the current code block context.
+        /// Compares the locking mechanisms of two <see cref="AccessInfo"/> objects to determine if they sync on the same object.
         /// </summary>
-        public static string GetBodyName(SyntaxNode body)
-        {
-            if (body is MethodDeclarationSyntax method) 
-                return method.Identifier.Text;
-
-            if (!(body is AccessorDeclarationSyntax accessor)) return "anonymous method";
-            var prop = accessor.Ancestors().OfType<PropertyDeclarationSyntax>().FirstOrDefault();
-            var propName = prop?.Identifier.Text ?? "UnknownProperty";
-            return $"{(accessor.Kind() == SyntaxKind.GetAccessorDeclaration ? "get" : "set")} of {propName}";
-        }
-        
-        public static bool IsCorrectlySynchronized(AccessInfo info1, AccessInfo info2)
+        /// /// <remarks>
+        /// The <see cref="AccessInfo"/> instances can be retrieved using <see cref="GetAccessedFieldsFromExpression"/>.
+        /// </remarks>
+        /// <param name="info1">The first <see cref="AccessInfo"/></param>
+        /// <param name="info2">The second <see cref="AccessInfo"/></param>
+        /// <returns>
+        /// <see langword="true"/> if both objects are explicitly locked using the exact same symbol; 
+        /// otherwise, <see langword="false"/>. Returns <see langword="false"/> if either lock object is <see langword="null"/>.
+        /// </returns>
+        public static bool IsUsingSameLockObject(AccessInfo info1, AccessInfo info2)
         {
             return info1.LockObject != null && 
                    info2.LockObject != null && 
                    SymbolEqualityComparer.Default.Equals(info1.LockObject, info2.LockObject);
         }
         
-        
-        public static string GetThreadName(ObjectCreationExpressionSyntax creation)
+        /// <summary>
+        /// Returns <see langword="true"/> if <paramref name="node"/> is protected by the
+        /// <c>Monitor.Enter</c> / <c>Monitor.Exit</c> manual-lock pattern i.e. a
+        /// <c>Monitor.Enter</c> call precedes it in the method body, and it is enclosed
+        /// in a try/finally whose finally block calls <c>Monitor.Exit</c>.
+        /// </summary>
+        public static bool IsInsideMonitorEnterRegion(SyntaxNode node, SemanticModel model)
         {
-            // Check if the thread is part of an assignment: var t1 = new Thread(...)
-            if (creation.Parent is EqualsValueClauseSyntax evc && evc.Parent is VariableDeclaratorSyntax vds)
+            var nodePos = node.SpanStart;
+
+            // 1. The node must be enclosed in a try/finally where the finally releases the lock
+            var coveringTry = node.Ancestors()
+                .OfType<TryStatementSyntax>()
+                .FirstOrDefault(t => t.Finally != null && HasMonitorExitInFinally(t.Finally, model));
+
+            if (coveringTry == null) return false;
+
+            // 2. A Monitor.Enter/TryEnter call must appear before this node in the method body
+            var methodBody = node.Ancestors()
+                .Select(a =>
+                {
+                    if (a is MethodDeclarationSyntax m)
+                        return m.Body as SyntaxNode;
+                    if (a is AnonymousFunctionExpressionSyntax f)
+                        return f.Body;
+                    return null;
+                })
+                .FirstOrDefault(b => b != null);
+
+            if (methodBody == null) return false;
+
+            return methodBody.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv =>
+                {
+                    if (inv.SpanStart >= nodePos) return false;
+                    var symbol = model.GetSymbolInfo(inv).Symbol as IMethodSymbol;
+                    return symbol?.ContainingType.ToDisplayString() == KnownTypes.FullMonitorName &&
+                           (symbol.Name == "Enter" || symbol.Name == "TryEnter");
+                });
+        }
+
+        /// <summary>
+        /// Returns <see langword="true"/> if the given finally clause contains a
+        /// <c>Monitor.Exit</c> call indicating a manually managed lock release.
+        /// </summary>
+        private static bool HasMonitorExitInFinally(FinallyClauseSyntax finallyClause, SemanticModel model)
+        {
+            return finallyClause.DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Any(inv =>
+                {
+                    var symbol = model.GetSymbolInfo(inv).Symbol as IMethodSymbol;
+                    return symbol?.ContainingType.ToDisplayString() == KnownTypes.FullMonitorName &&
+                           symbol.Name == "Exit";
+                });
+        }
+        
+        private static IFieldSymbol FindLocksFieldSymbol(INamedTypeSymbol typeSymbol)
+        {
+            // 1. Search current class level fields for the '_locks' identifier
+            var field = typeSymbol.GetMembers().OfType<IFieldSymbol>().FirstOrDefault(f => f.Name == "_locks");
+            if (field != null) return field;
+
+            // 2. Recurse into nested classes (like the Tables block) using a separate variable
+            foreach (var nestedType in typeSymbol.GetTypeMembers())
             {
-                return vds.Identifier.Text;
+                var nestedField = FindLocksFieldSymbol(nestedType);
+                if (nestedField != null) return nestedField;
             }
-            return "Anonymous Thread";
+            return null;
+        }
+
+        public static ISymbol GetManualLockSymbolIfAny(SyntaxNode methodSyntax, SemanticModel semanticModel)
+        {
+            var tryStmts = methodSyntax.DescendantNodes().OfType<TryStatementSyntax>();
+            foreach (var tryStmt in tryStmts)
+            {
+                if (tryStmt.Finally == null) continue;
+
+                // 1. Inspect the finally block for explicit lock releases
+                var finallyInvocations = tryStmt.Finally.DescendantNodes().OfType<InvocationExpressionSyntax>();
+                bool releasesLock = false;
+                foreach (var inv in finallyInvocations)
+                {
+                    if (semanticModel.GetSymbolInfo(inv).Symbol is IMethodSymbol methodSymbol)
+                    {
+                        if (methodSymbol.Name == "Exit" || methodSymbol.Name.Contains("ReleaseLocks"))
+                        {
+                            releasesLock = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!releasesLock) continue;
+
+                // 2. Inspect the overarching scope or try block for companion acquisitions
+                var tryAndBodyInvocations = methodSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>();
+                bool acquiresLock = false;
+                foreach (var inv in tryAndBodyInvocations)
+                {
+                    if (semanticModel.GetSymbolInfo(inv).Symbol is IMethodSymbol methodSymbol)
+                    {
+                        if (methodSymbol.Name == "Enter" || methodSymbol.Name.Contains("Acquire"))
+                        {
+                            acquiresLock = true;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. Unify the operations under the shared striped lock reference boundary
+                if (acquiresLock)
+                {
+                    var containingClass = methodSyntax.Ancestors().OfType<ClassDeclarationSyntax>().FirstOrDefault();
+                    if (containingClass != null)
+                    {
+                        if (semanticModel.GetDeclaredSymbol(containingClass) is INamedTypeSymbol classSymbol)
+                        {
+                            var locksField = FindLocksFieldSymbol(classSymbol);
+                            if (locksField != null) return locksField;
+                        }
+                    }
+                }
+            }
+            return null;
         }
     }
 }

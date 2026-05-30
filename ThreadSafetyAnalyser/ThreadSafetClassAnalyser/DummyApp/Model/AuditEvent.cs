@@ -1,4 +1,6 @@
-   
+using System;
+using System.Collections.Generic;
+
 namespace DummyApp.Model;
 /// <summary>
 /// Represents the output of the audit process

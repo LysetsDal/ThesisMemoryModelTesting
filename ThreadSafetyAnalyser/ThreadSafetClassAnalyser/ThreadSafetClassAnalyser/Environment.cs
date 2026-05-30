@@ -2,6 +2,6 @@ namespace ThreadSafetClassAnalyser.Utils
 {
     public static class Environment
     {
-        public const bool USE_ANNOTATION = false;
+        public const bool USE_ANNOTATION = true;
     }
 }

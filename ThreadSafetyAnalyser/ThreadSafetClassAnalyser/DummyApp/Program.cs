@@ -1,6 +1,7 @@
 using System;
 using Annotations;
 using DummyApp.Src;
+// ReSharper disable UnusedVariable
 
 namespace DummyApp;
 
@@ -9,18 +10,22 @@ internal static class Program
 {
     private static readonly object Lock = new();
     
-    private static void Main(string[] args)
+    private static void Main()
     {
         // ----- Visibility -----
         var visibility = new Visibility();
         
-        // Should flag warning
+        // Should flag warning: FieldDoesNotUseLock
         visibility.GetCount();
+
+        // Prop should flag FieldAccessedExternally warning
+        var @break = visibility.PublicPropBreakingEncapsulation;
+        
+        // Field should flag FieldAccessedExternally warning
+        var @field = visibility._transactions;
 
         // Should not flag if readonly 
         var externalAccess = visibility._transactionReadOnly;
-        
-        
         
         lock (Lock)
         {
@@ -41,14 +46,16 @@ internal static class Program
 
     public static Visibility Connect()
     {
-        var result = new Visibility();
+        var visibility = new Visibility();
 
         try
         {
-            result.PublicPropBreakingEncapsulation = false;
-            var tmp = result.PrivateReadonlyProp;
+            // Should flag FieldAccessedExternally warning
+            visibility.PublicPropBreakingEncapsulation = false;
+            var tmp = visibility.PrivateReadonlyProp;
 
-            var tmp2 = result.PublicPropWithSynchronization;
+            // Should not flag warning
+            var tmp2 = visibility.PublicPropWithSynchronization;
 
         }
         catch (Exception e)
@@ -56,7 +63,7 @@ internal static class Program
             Console.WriteLine(e.Message);
         }
 
-        return result;
+        return visibility;
     }
     
 }

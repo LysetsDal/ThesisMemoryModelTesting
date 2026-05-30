@@ -296,5 +296,95 @@ namespace ThreadSafetClassAnalyser {
                 return ResourceManager.GetString("LockOnClassInstanceMessageFormat", resourceCulture);
             }
         }
+        
+        internal static string ConflictingAccessRuleTitle {
+            get {
+                return ResourceManager.GetString("ConflictingAccessRuleTitle", resourceCulture);
+            }
+        }
+        
+        internal static string ConflictingAccessRuleDescription {
+            get {
+                return ResourceManager.GetString("ConflictingAccessRuleDescription", resourceCulture);
+            }
+        }
+        
+        internal static string ConflictingAccessRuleMessageFormat {
+            get {
+                return ResourceManager.GetString("ConflictingAccessRuleMessageFormat", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorNotPairedTitle {
+            get {
+                return ResourceManager.GetString("MonitorNotPairedTitle", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorNotPairedMessageFormat {
+            get {
+                return ResourceManager.GetString("MonitorNotPairedMessageFormat", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorNotPairedDescription {
+            get {
+                return ResourceManager.GetString("MonitorNotPairedDescription", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorNotInFinallyTitle {
+            get {
+                return ResourceManager.GetString("MonitorNotInFinallyTitle", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorNotInFinallyMessageFormat {
+            get {
+                return ResourceManager.GetString("MonitorNotInFinallyMessageFormat", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorNotInFinallyDescription {
+            get {
+                return ResourceManager.GetString("MonitorNotInFinallyDescription", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorConflictingAccessTitle {
+            get {
+                return ResourceManager.GetString("MonitorConflictingAccessTitle", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorConflictingAccessMessageFormat {
+            get {
+                return ResourceManager.GetString("MonitorConflictingAccessMessageFormat", resourceCulture);
+            }
+        }
+        
+        internal static string MonitorConflictingAccessDescription {
+            get {
+                return ResourceManager.GetString("MonitorConflictingAccessDescription", resourceCulture);
+            }
+        }
+        
+        internal static string SP002Title {
+            get {
+                return ResourceManager.GetString("SP002Title", resourceCulture);
+            }
+        }
+        
+        internal static string SP002Description {
+            get {
+                return ResourceManager.GetString("SP002Description", resourceCulture);
+            }
+        }
+        
+        internal static string SP002MessageFormat {
+            get {
+                return ResourceManager.GetString("SP002MessageFormat", resourceCulture);
+            }
+        }
     }
 }

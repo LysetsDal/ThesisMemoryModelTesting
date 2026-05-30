@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <EnableNetAnalyzers>false</EnableNetAnalyzers>
+        <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild><EnforceCodeStyleInBuild></EnforceCodeStyleInBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="/Users/asgerlysdahl/RiderProjects/ThesisMemoryModelTesting/ThreadSafetyAnalyser/ThreadSafetClassAnalyser/ThreadsafeClassAnalyser.Annotations/ThreadsafeClassAnalyser.Annotations.csproj" />
+
+        <ProjectReference Include="/Users/asgerlysdahl/RiderProjects/ThesisMemoryModelTesting/ThreadSafetyAnalyser/ThreadSafetClassAnalyser/ThreadSafetClassAnalyser/ThreadSafetClassAnalyser.csproj"
+                          OutputItemType="Analyzer"
+                          ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <!-- Insert after whatever native propertygroups there are. (Or in its own PropertyGroup)-->
+        <_SarifTimestamp Condition="'$(_SarifTimestamp)' == ''">$([System.DateTime]::Now.ToString("yyyyMMdd_HHmmss"))</_SarifTimestamp>
+        <ErrorLog>$(SolutionDir).sarif\$(MSBuildProjectName)_$(_SarifTimestamp).json;version=2.1</ErrorLog>
+        <ReportAnalyzer>true</ReportAnalyzer>
+    </PropertyGroup>
+    <!--Ensure that there is a directory to output the report into-->
+    <Target Name="CreateSarifDirectory" BeforeTargets="CoreCompile">
+        <MakeDir Directories="$(SolutionDir).sarif" />
+    </Target>
+
+</Project>

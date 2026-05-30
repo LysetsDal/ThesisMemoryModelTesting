@@ -118,50 +118,50 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="AnalyzerDescription" xml:space="preserve">
-    <value>Type names should be all uppercase.</value>
-    <comment>An optional longer localizable description of the diagnostic.</comment>
+    <value>Type names should be all uppercase</value>
+    <comment>An optional longer localizable description of the diagnostic</comment>
   </data>
   <data name="AnalyzerMessageFormat" xml:space="preserve">
     <value>Type name '{0}' contains lowercase letters. </value>
-    <comment>The format-able message the diagnostic displays.</comment>
+    <comment>The format-able message the diagnostic displays</comment>
   </data>
   <data name="AnalyzerTitle" xml:space="preserve">
     <value>Type name contains lowercase letters</value>
-    <comment>The title of the diagnostic.</comment>
+    <comment>The title of the diagnostic</comment>
   </data>
   <data name="FieldUsedTitle" xml:space="preserve">
     <value>Field used in method</value>
-    <comment>The title of the diagnostic for field usage in methods.</comment>
+    <comment>The title of the diagnostic for field usage in methods</comment>
   </data>
   <data name="FieldUsedMessageFormat" xml:space="preserve">
     <value>Field '{0}' is used in method '{1}'</value>
-    <comment>The format-able message the diagnostic displays when a field is used in a method.</comment>
+    <comment>The format-able message the diagnostic displays when a field is used in a method</comment>
   </data>
   <data name="FieldUsedDescription" xml:space="preserve">
-    <value>Warns when a field is used in any method.</value>
-    <comment>An optional longer localizable description of the diagnostic for field usage.</comment>
+    <value>Warns when a field is used in any method</value>
+    <comment>An optional longer localizable description of the diagnostic for field usage</comment>
   </data>
   <data name="FieldAccessedExternallyTitle" xml:space="preserve">
     <value>Field or property accessed outside declaring class</value>
-    <comment>The title of the diagnostic for external field/property access.</comment>
+    <comment>The title of the diagnostic for external field/property access</comment>
   </data>
   <data name="FieldAccessedExternallyMessageFormat" xml:space="preserve">
-    <value>The field or property '{0}' is accessed from outside its declaring class '{1}'.</value>
-    <comment>The format-able message the diagnostic displays when a field or property is accessed externally.</comment>
+    <value>The field or property '{0}' is accessed from outside its declaring class '{1}'</value>
+    <comment>The format-able message the diagnostic displays when a field or property is accessed externally</comment>
   </data>
   <data name="FieldAccessedExternallyDescription" xml:space="preserve">
-    <value>Warns when a field or property is accessed from outside its declaring class, which may indicate state escape or a violation of encapsulation.</value>
-    <comment>An optional longer localizable description of the diagnostic for external field/property access.</comment>
+    <value>Warns when a field or property is accessed from outside its declaring class, which may indicate state escape or a violation of encapsulation</value>
+    <comment>An optional longer localizable description of the diagnostic for external field/property access</comment>
   </data>
   
   <data name="FieldDoesNotUseLockDescription" xml:space="preserve">
-    <value>Warn when a field or property accessor is publicly visible and doesn't use a lock.</value>
+    <value>Warn when a field or property accessor is publicly visible and doesn't use a lock</value>
   </data>
   <data name="FieldDoesNotUseLockTitle" xml:space="preserve">
-    <value>Accessor is publicly available but doesn't use a lock.</value>
+    <value>Accessor is publicly available but doesn't use a lock</value>
   </data>
   <data name="FieldDoesNotUseLockMessageFormat" xml:space="preserve">
-    <value>The Accessor '{0}' in '{1}' can be called from outside its declaring class and doesn't use a lock. </value>
+    <value>The Accessor '{0}' in '{1}' can be called from outside its declaring class and doesn't use a lock</value>
   </data>
   
   <data name="TestRuleTitle" xml:space="preserve">
@@ -205,7 +205,7 @@
     <value>Conflicting access between threads</value>
   </data>
   <data name="ConflictingAccessThreadMessageFormat" xml:space="preserve">
-    <value>There is a conflicting access on field '{0}' between Thread '{1}' and Thread '{2}' </value>
+    <value>There is a conflicting access on field '{0}' between Thread '{1}' and Thread '{2}'</value>
   </data>
   <data name="ConflictingAccessThreadDescription" xml:space="preserve">
     <value>Conflicting accesses in threads where atleast one access is a write</value>
@@ -214,28 +214,28 @@
     <value>Field is not safely published</value>
   </data>
   <data name="SP001MessageFormat" xml:space="preserve">
-    <value>Field '{0}' is not safely published. Declare it as 'readonly' or 'volatile' to ensure safe publication.</value>
+    <value>Field '{0}' is not safely published. Declare it as 'readonly' or 'volatile' to ensure safe publication</value>
   </data>
   <data name="SP001Description" xml:space="preserve">
-    <value>All fields should be safely published by being readonly, volatile, or initialized to a default value without relying on constructor logic.</value>
+    <value>All fields should be safely published by being readonly, volatile, or initialized to a default value without relying on constructor logic</value>
   </data>
   <data name="SP003Title" xml:space="preserve">
     <value>Virtual method called in constructor</value>
   </data>
   <data name="SP003MessageFormat" xml:space="preserve">
-    <value>Constructor of '{0}' calls virtual method '{1}'. A derived class override may run before the derived constructor body, observing uninitialized fields.</value>
+    <value>Constructor of '{0}' calls virtual method '{1}'. A derived class override may run before the derived constructor body, observing uninitialized fields</value>
   </data>
   <data name="SP003Description" xml:space="preserve">
-    <value>Calling a virtual method in a constructor is unsafe when a derived class overrides it and reads fields that are set in the derived constructor body, not in initializers.</value>
+    <value>Calling a virtual method in a constructor is unsafe when a derived class overrides it and reads fields that are set in the derived constructor body, not in initializers</value>
   </data>
   <data name="VolatileReorderingTitle" xml:space="preserve">
-    <value>Possible volatile store/load reordering.</value>
+    <value>Possible volatile store/load reordering</value>
   </data>
   <data name="VolatileReorderingMessageFormat" xml:space="preserve">
-    <value>The volatile read '{0}' in method '{1}' is at risk of being reordered to happen before the volatile write '{2}' in the same method.</value>
+    <value>The volatile read '{0}' in method '{1}' is at risk of being reordered to happen before the volatile write '{2}' in the same method</value>
   </data>
   <data name="VolatileReorderingDescription" xml:space="preserve">
-    <value>In C# a volatile write followed by a volatile read may be reordered without a full-fence memory barrier.</value>
+    <value>In C# a volatile write followed by a volatile read may be reordered without a full-fence memory barrier</value>
   </data>
   <data name="InconsistentLockUseTitle" xml:space="preserve">
     <value>Inconsistent Lock usage on field or property</value>
@@ -245,15 +245,61 @@
   </data>
   <data name="InconsistentLockUseMessageFormat" xml:space="preserve">
     <value>The field '{0}' uses lock '{1}' but other places it uses lock '{2}'</value>
-  </data>  
+  </data>
   <data name="LockOnClassInstanceTitle" xml:space="preserve">
     <value>Do not use 'lock (this)'</value>
   </data>
   <data name="LockOnClassInstanceDescription" xml:space="preserve">
-    <value>Locking on 'this' exposes the sync object to external callers, which can lead to deadlocks.</value>
+    <value>Locking on 'this' exposes the sync object to external callers, which can lead to deadlocks</value>
   </data>
   <data name="LockOnClassInstanceMessageFormat" xml:space="preserve">
-    <value>The class '{0}' uses 'lock (this)' in method '{1}'. This can cause deadlocks if external code also locks on the instance. Use a private lock object instead.</value>
+    <value>The class '{0}' uses 'lock (this)' in method '{1}'. This can cause deadlocks if external code also locks on the instance. Use a private lock object instead</value>
   </data>
-  
+  <data name="ConflictingAccessRuleTitle" xml:space="preserve">
+    <value>Conflicting access to shared mutable state across members</value>
+  </data>
+  <data name="ConflictingAccessRuleDescription" xml:space="preserve">
+    <value>Multiple class members access the same mutable field concurrently without a shared lock, where at least one operation is a write. This can introduce data races and memory reordering bugs</value>
+  </data>
+  <data name="ConflictingAccessRuleMessageFormat" xml:space="preserve">
+    <value>Method '{1}()' can conflict with method '{2}()' on the shared state '{0}' because they lack proper synchronization and at least one method is a write operation ({3}).</value>
+  </data>
+  <data name="MonitorNotPairedTitle" xml:space="preserve">
+    <value>Unpaired Monitor.Enter call</value>
+  </data>
+  <data name="MonitorNotPairedMessageFormat" xml:space="preserve">
+    <value>Method '{0}' calls 'Monitor.Enter' on '{1}' but has no matching 'Monitor.Exit' call. This will cause the lock to never be released</value>
+  </data>
+  <data name="MonitorNotPairedDescription" xml:space="preserve">
+    <value>Every 'Monitor.Enter' call must be matched by a 'Monitor.Exit' call. An unpaired enter will permanently hold the lock, causing deadlocks for all other threads trying to acquire it</value>
+  </data>
+
+  <data name="MonitorNotInFinallyTitle" xml:space="preserve">
+    <value>Monitor.Enter not protected by try/finally</value>
+  </data>
+  <data name="MonitorNotInFinallyMessageFormat" xml:space="preserve">
+    <value>Method '{0}' calls 'Monitor.Enter' on '{1}' without a try/finally block. An exception will prevent 'Monitor.Exit' from running and leave the lock permanently acquired</value>
+  </data>
+  <data name="MonitorNotInFinallyDescription" xml:space="preserve">
+    <value>'Monitor.Enter' must be followed immediately by a try block with 'Monitor.Exit' in the finally clause. Without this pattern, any exception thrown inside the critical section will permanently hold the lock</value>
+  </data>
+
+  <data name="MonitorConflictingAccessTitle" xml:space="preserve">
+    <value>Conflicting access to shared state inside Monitor-guarded region</value>
+  </data>
+  <data name="MonitorConflictingAccessMessageFormat" xml:space="preserve">
+    <value>Method '{1}()' accesses shared field '{0}' inside a 'Monitor' critical section, but method '{2}()' accesses the same field without equivalent synchronization</value>
+  </data>
+  <data name="MonitorConflictingAccessDescription" xml:space="preserve">
+    <value>A field accessed inside a 'Monitor.Enter'/'Monitor.Exit' critical section is also accessed in another method without equivalent synchronization. This can introduce data races</value>
+  </data>
+  <data name="SP002Title" xml:space="preserve">
+    <value>This reference escapes constructor</value>
+  </data>
+  <data name="SP002Description" xml:space="preserve">
+    <value>This reference escapes during constructor</value>
+  </data>
+  <data name="SP002MessageFormat" xml:space="preserve">
+    <value>The 'this' reference escapes the constructor of class '{0}' via {1} to '{2}'. This may expose uninitialized state to other threads.</value>
+  </data>
 </root>

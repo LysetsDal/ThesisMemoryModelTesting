@@ -1,6 +1,10 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Annotations;
+// ReSharper disable CheckNamespace
+// ReSharper disable UnusedVariable
+// ReSharper disable MemberCanBePrivate.Global
+// ReSharper disable UnusedMember.Local
 
 namespace DummyApp.Src;
 
@@ -14,19 +18,28 @@ public class CorrectlySynchronized
     private readonly object _csLock = new();
     private readonly object _csLock2 = new();
     
+    // Should flag ConflictingAccessRule warning
     public int GetOtherWork()
     {
-        return _otherWork;
+        lock (this)
+        {
+            return _otherWork;
+        }
     }    
     
+    // Should flag ConflictingAccessRule warning
     public void SetOtherWork(int otherWork)
     {
-        _otherWork = otherWork;
+        lock (this)
+        {
+            _otherWork = otherWork;
+        }
     }
-
-
+    
+    //Should flag ConflictingAccessRule warning
     public void BadLockingOnClassInstance()
     {
+        // Should flag LockOnClassInstance warning
         lock (this)
         {
             var tmp = GetOtherWork();
@@ -34,14 +47,14 @@ public class CorrectlySynchronized
         }
     }
     
-
     // ====================================
     // ============== Threads =============
     // ====================================
-    // Should flag a warning on both tread bodies
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedThreads_DifferentLockSymbols()
     {
-        var t1 = new Thread(() =>
+        // should flag ConflictingAccessThread warning
+        var thread1 = new Thread(() =>
         {
             lock (_csLock2)
             {
@@ -49,7 +62,8 @@ public class CorrectlySynchronized
             }
         });
         
-        var t2 = new Thread(() =>
+        // should flag ConflictingAccessThread warning
+        var thread2 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -58,15 +72,17 @@ public class CorrectlySynchronized
         });
     }    
     
-    // Should flag a warning on both tread bodies
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedThreads_OneLockSymbols()
     {
-        var t1 = new Thread(() =>
+        // should flag ConflictingAccessThread warning
+        var thread3 = new Thread(() =>
         {
                 var tmp = GetOtherWork();
         });
         
-        var t2 = new Thread(() =>
+        // should flag ConflictingAccessThread warning
+        var thread4 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -75,10 +91,11 @@ public class CorrectlySynchronized
         });
     }    
     
-    // Should not flag a warning
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedThreads_SameLockSymbols()
     {
-        var t3 = new Thread(() =>
+        // should not flag a warning
+        var thread5 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -86,7 +103,8 @@ public class CorrectlySynchronized
             }
         });
         
-        var t4 = new Thread(() =>
+        // should not flag a warning
+        var thread6 = new Thread(() =>
         {
             lock (_csLock)
             {
@@ -99,11 +117,11 @@ public class CorrectlySynchronized
     // =============== TASKS ==============
     // ====================================
     
-    
-    // Should flag warning
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedTasks_DifferentLockSymbols()
     {
-        var t1 = new Task(() =>
+        // should flag ConflictingAccessThread warning
+        var task1 = new Task(() =>
         {
             lock (_csLock2)
             {
@@ -111,7 +129,8 @@ public class CorrectlySynchronized
             }
         });
         
-        var t2 = new Task(() =>
+        // should flag ConflictingAccessThread warning
+        var task2 = new Task(() =>
         {
             lock (_csLock)
             {
@@ -120,15 +139,17 @@ public class CorrectlySynchronized
         });
     } 
     
-    // Should flag a warning on both tread bodies
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedTasks_OneLockSymbols()
     {
-        var t1 = new Task(() =>
+        // should flag ConflictingAccessThread warning
+        var task3 = new Task(() =>
         {
             var tmp = GetOtherWork();
         });
         
-        var t2 = new Task(() =>
+        // should flag ConflictingAccessThread warning
+        var task4 = new Task(() =>
         {
             lock (_csLock)
             {
@@ -137,10 +158,10 @@ public class CorrectlySynchronized
         });
     }   
     
-    // Should not flag a warning
+    // Should flag ConflictingAccessRule warning
     public void TwoLockedTasks_SameLockSymbols()
     {
-        var t3 = new Task(() =>
+        var task5 = new Task(() =>
         {
             lock (_csLock)
             {
@@ -148,7 +169,7 @@ public class CorrectlySynchronized
             }
         });
         
-        var t4 = new Task(() =>
+        var task6 = new Task(() =>
         {
             lock (_csLock)
             {
