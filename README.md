@@ -1,6 +1,33 @@
 # ThesisMemoryModelTesting
 
-Build Analyser dll on Asger's Machine
+**ThreadSafetClassAnalyser** is a Roslyn-based static analysis tool for C# designed to detect and prevent concurrency errors at the class level.
+
+Developed as part of a Master's thesis at the IT University of Copenhagen (ITU), this prototype bridges the gap between memory model semantics (ECMA-335) and practical C# software engineering. It enforces Goetz-inspired thread-safety properties through three primary analytical pillars:
+
+* **Encapsulation Boundaries:** Prevents the raw exposure of mutable state and ensures synchronization objects (locks) do not escape the class via public members.
+* **Safe Publication:** Verifies that an object's state is fully initialized before its reference (`this`) escapes the constructor scope.
+* **Correct Synchronization:** Enforces a consistent locking strategy and performs pairwise conflict analysis to detect unsynchronized memory accesses on shared mutable fields across concurrent execution paths.
+
+---
+
+## Getting Started
+
+### Building the Analyzer (macOS)
+To compile the analyzer and its dependencies on a macOS machine, navigate to the project directory and run the following build commands:
+
+```bash
+cd /Users/asgerlysdahl/RiderProjects/ThesisMemoryModelTesting/ThreadSafetyAnalyser/ThreadSafetClassAnalyser
+dotnet clean
+dotnet restore 
+dotnet build ThreadsafeClassAnalyser.Annotations/ThreadsafeClassAnalyser.Annotations.csproj
+dotnet build ThreadSafetClassAnalyser/ThreadSafetClassAnalyser.csproj 
+dotnet build ThreadSafetClassAnalyser.CodeFixes/ThreadSafetClassAnalyser.CodeFixes.csproj
+dotnet build ThreadSafetClassAnalyser.Package/ThreadSafetClassAnalyser.Package.csproj
+```
+
+
+
+Build Analyser dll on MacOs Machine
 ```bash
 cd /Users/asgerlysdahl/RiderProjects/ThesisMemoryModelTesting/ThreadSafetyAnalyser/ThreadSafetClassAnalyser ;
 dotnet clean ; dotnet restore ; 
