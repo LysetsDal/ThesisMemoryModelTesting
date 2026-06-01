@@ -1,6 +1,6 @@
 # ThesisMemoryModelTesting
 
-The **ThreadSafetyAnalyser/ThreadSafetClassAnalyser** houses all code related to the Roslyn Prototype
+The **ThreadSafetyAnalyser/** directory houses all code related to the Roslyn Prototype.
 
 **ThreadSafetClassAnalyser** is a Roslyn-based static analysis tool for C# designed to detect and prevent concurrency errors at the class level.
 
