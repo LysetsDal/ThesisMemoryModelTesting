@@ -1,5 +1,7 @@
 # ThesisMemoryModelTesting
 
+The **ThreadSafetyAnalyser/ThreadSafetClassAnalyser** houses all code related to the Roslyn Prototype
+
 **ThreadSafetClassAnalyser** is a Roslyn-based static analysis tool for C# designed to detect and prevent concurrency errors at the class level.
 
 Developed as part of a Master's thesis at the IT University of Copenhagen (ITU), this prototype bridges the gap between memory model semantics (ECMA-335) and practical C# software engineering. It enforces Goetz-inspired thread-safety properties through three primary analytical pillars:
